@@ -1,0 +1,5 @@
+{
+  "name": "SoulMirror AI Healing Diary",
+  "description": "A minimalist, AI-powered emotional healing diary that tracks your mood timeline and provides professional life coaching insights using Gemini AI.",
+  "requestFramePermissions": []
+}
