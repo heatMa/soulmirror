@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { DiaryEntry, ViewMode } from './types';
 import DiaryEntryForm from './components/DiaryEntryForm';
 import Dashboard from './components/Dashboard';
@@ -9,53 +9,64 @@ import DailyNoteEditor from './components/DailyNoteEditor';
 import TimelineItem from './components/TimelineItem';
 import { ICONS, MOOD_OPTIONS, MoodOption } from './constants';
 import { evaluateMoodScore } from './services/geminiService';
+import { databaseService } from './services/databaseService';
 
 const App: React.FC = () => {
   const [entries, setEntries] = useState<DiaryEntry[]>([]);
   const [viewMode, setViewMode] = useState<ViewMode>(ViewMode.TIMELINE);
   const [showAddForm, setShowAddForm] = useState(false);
-  const [editingEntry, setEditingEntry] = useState<DiaryEntry | null>(null); // Track entry being edited
+  const [editingEntry, setEditingEntry] = useState<DiaryEntry | null>(null);
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [customMoods, setCustomMoods] = useState<MoodOption[]>([]);
   const [dailyNotes, setDailyNotes] = useState<Record<string, string>>({});
   const [greeting, setGreeting] = useState('');
   const [isCopied, setIsCopied] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [dbError, setDbError] = useState<string | null>(null);
 
-  // Load Diary Entries
+  // 初始化数据库并加载数据
   useEffect(() => {
-    const savedEntries = localStorage.getItem('soulmirror_diary');
-    if (savedEntries) {
+    const initializeApp = async () => {
       try {
-        setEntries(JSON.parse(savedEntries));
-      } catch (e) { console.error("Failed to load diary entries"); }
-    }
+        setIsLoading(true);
+        setDbError(null);
+        
+        // 初始化数据库
+        await databaseService.initialize();
+        
+        // 并行加载所有数据
+        const [loadedEntries, loadedNotes, loadedCustomMoods] = await Promise.all([
+          databaseService.getAllEntries(),
+          databaseService.getAllDailyNotes(),
+          databaseService.getCustomMoods()
+        ]);
+        
+        setEntries(loadedEntries);
+        setDailyNotes(loadedNotes);
+        setCustomMoods(loadedCustomMoods);
+        
+        console.log('应用数据加载完成');
+      } catch (error) {
+        console.error('数据库初始化失败:', error);
+        setDbError('数据加载失败，请刷新页面重试');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    initializeApp();
   }, []);
 
-  // Load Daily Notes
+  // 打开添加表单时重新加载自定义心情
   useEffect(() => {
-    const savedNotes = localStorage.getItem('soulmirror_daily_notes');
-    if (savedNotes) {
-      try {
-        setDailyNotes(JSON.parse(savedNotes));
-      } catch (e) { console.error("Failed to load daily notes"); }
+    if (showAddForm) {
+      databaseService.getCustomMoods()
+        .then(setCustomMoods)
+        .catch(console.error);
     }
-  }, []);
+  }, [showAddForm]);
 
-  useEffect(() => {
-    const savedCustomMoods = localStorage.getItem('soulmirror_custom_moods');
-    if (savedCustomMoods) {
-      try {
-        setCustomMoods(JSON.parse(savedCustomMoods));
-      } catch (e) { console.error("Failed to load custom moods"); }
-    }
-  }, [showAddForm]); 
-
-  useEffect(() => {
-    if (entries.length > 0) {
-      localStorage.setItem('soulmirror_diary', JSON.stringify(entries));
-    }
-  }, [entries]);
-
+  // 设置问候语
   useEffect(() => {
     const hour = new Date().getHours();
     if (hour < 6) setGreeting('夜深了，愿你安梦');
@@ -65,91 +76,100 @@ const App: React.FC = () => {
     else setGreeting('晚上好，卸下一身疲惫');
   }, []);
 
-  // Handle Add or Update
-  const handleSaveEntry = (formData: Omit<DiaryEntry, 'id' | 'timestamp'> & { id?: string, timestamp?: number }) => {
-    if (formData.id) {
-        // --- Update Existing Entry ---
+  // 保存日记条目
+  const handleSaveEntry = useCallback(async (formData: Omit<DiaryEntry, 'id' | 'timestamp'> & { id?: string, timestamp?: number }) => {
+    try {
+      if (formData.id) {
+        // 更新现有条目
         const updatedEntry: DiaryEntry = {
-            id: formData.id,
-            timestamp: formData.timestamp || Date.now(),
-            content: formData.content,
-            mood: formData.mood,
-            moodScore: formData.moodScore,
-            tags: formData.tags
+          id: formData.id,
+          timestamp: formData.timestamp || Date.now(),
+          content: formData.content,
+          mood: formData.mood,
+          moodScore: formData.moodScore,
+          tags: formData.tags
         };
 
+        await databaseService.updateEntry(updatedEntry);
         setEntries(prev => prev.map(e => e.id === updatedEntry.id ? updatedEntry : e));
 
-        // Trigger AI Re-scoring
+        // AI 重新评分
         evaluateMoodScore(updatedEntry.mood, updatedEntry.content)
-            .then((aiScore) => {
-                if (aiScore > 0) {
-                    setEntries(currentEntries => 
-                        currentEntries.map(e => e.id === updatedEntry.id ? { ...e, moodScore: aiScore } : e)
-                    );
-                }
-            })
-            .catch(console.error);
+          .then(async (aiScore) => {
+            if (aiScore > 0) {
+              await databaseService.updateEntryMoodScore(updatedEntry.id, aiScore);
+              setEntries(currentEntries => 
+                currentEntries.map(e => e.id === updatedEntry.id ? { ...e, moodScore: aiScore } : e)
+              );
+            }
+          })
+          .catch(console.error);
 
-    } else {
-        // --- Add New Entry ---
-        const id = crypto.randomUUID();
+      } else {
+        // 添加新条目
         const now = new Date();
         let timestamp = now.getTime();
         
-        // If adding to a past date selected in calendar
         const isSameDay = (d1: Date, d2: Date) => 
           d1.getDate() === d2.getDate() &&
           d1.getMonth() === d2.getMonth() &&
           d1.getFullYear() === d2.getFullYear();
 
         if (!isSameDay(selectedDate, now)) {
-           const targetTime = new Date(selectedDate);
-           targetTime.setHours(now.getHours(), now.getMinutes(), now.getSeconds());
-           timestamp = targetTime.getTime();
+          const targetTime = new Date(selectedDate);
+          targetTime.setHours(now.getHours(), now.getMinutes(), now.getSeconds());
+          timestamp = targetTime.getTime();
         }
 
-        const newEntry: DiaryEntry = {
-          id,
+        const entryData = {
           timestamp,
           content: formData.content,
           mood: formData.mood,
           moodScore: formData.moodScore,
           tags: formData.tags
         };
-        
+
+        const newEntry = await databaseService.addEntry(entryData);
         setEntries(prev => [newEntry, ...prev]);
 
-        // Background AI Scoring
+        // AI 后台评分
         evaluateMoodScore(newEntry.mood, newEntry.content)
-          .then((aiScore) => {
+          .then(async (aiScore) => {
             if (aiScore > 0) {
+              await databaseService.updateEntryMoodScore(newEntry.id, aiScore);
               setEntries(currentEntries => 
-                currentEntries.map(e => e.id === id ? { ...e, moodScore: aiScore } : e)
+                currentEntries.map(e => e.id === newEntry.id ? { ...e, moodScore: aiScore } : e)
               );
             }
           })
           .catch(console.error);
+      }
+    } catch (error) {
+      console.error('保存日记条目失败:', error);
     }
-  };
+  }, [selectedDate]);
 
-  const deleteEntry = (id: string) => {
+  // 删除日记条目
+  const deleteEntry = useCallback(async (id: string) => {
     if (confirm("确定要删除这条记录吗？")) {
-      const newEntries = entries.filter(e => e.id !== id);
-      setEntries(newEntries);
-      if (newEntries.length === 0) {
-         localStorage.setItem('soulmirror_diary', JSON.stringify([]));
+      try {
+        await databaseService.deleteEntry(id);
+        setEntries(prev => prev.filter(e => e.id !== id));
+      } catch (error) {
+        console.error('删除日记条目失败:', error);
       }
     }
-  };
+  }, []);
 
-  const saveDailyNote = (dateStr: string, content: string) => {
-    setDailyNotes(prev => {
-      const updated = { ...prev, [dateStr]: content };
-      localStorage.setItem('soulmirror_daily_notes', JSON.stringify(updated));
-      return updated;
-    });
-  };
+  // 保存每日笔记
+  const saveDailyNote = useCallback(async (dateStr: string, content: string) => {
+    try {
+      await databaseService.saveDailyNote(dateStr, content);
+      setDailyNotes(prev => ({ ...prev, [dateStr]: content }));
+    } catch (error) {
+      console.error('保存每日笔记失败:', error);
+    }
+  }, []);
 
   const getMoodConfig = (moodLabel: string) => {
     return MOOD_OPTIONS.find(m => m.label === moodLabel) || 
@@ -157,7 +177,7 @@ const App: React.FC = () => {
            MOOD_OPTIONS[2];
   };
 
-  // Sort by time ascending for the timeline view
+  // 按时间升序排序用于时间线视图
   const timelineEntries = entries
     .filter(entry => {
       const entryDate = new Date(entry.timestamp);
@@ -208,6 +228,36 @@ const App: React.FC = () => {
       setEditingEntry(entry);
       setShowAddForm(true);
   };
+
+  // 加载状态
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 to-slate-100">
+        <div className="text-center">
+          <div className="w-12 h-12 border-4 border-gray-200 border-t-gray-800 rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-gray-500 font-medium">正在加载数据...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // 错误状态
+  if (dbError) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 to-slate-100">
+        <div className="text-center px-6">
+          <div className="text-5xl mb-4">😢</div>
+          <p className="text-gray-700 font-medium mb-4">{dbError}</p>
+          <button 
+            onClick={() => window.location.reload()}
+            className="px-6 py-2 bg-gray-800 text-white rounded-xl hover:bg-gray-900 transition-colors"
+          >
+            刷新页面
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen text-slate-800 flex flex-col font-sans">

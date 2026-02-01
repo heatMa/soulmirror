@@ -18,6 +18,10 @@ export default defineConfig(({ mode }) => {
         alias: {
           '@': path.resolve(__dirname, '.'),
         }
-      }
+      },
+      optimizeDeps: {
+        exclude: ['jeep-sqlite/loader']
+      },
+      assetsInclude: ['**/*.wasm']
     };
 });
