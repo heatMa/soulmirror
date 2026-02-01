@@ -14,37 +14,25 @@ type TimeRange = 'today' | 'week' | 'month';
 const CustomTooltip = ({ active, payload, label }: any) => {
   if (active && payload && payload.length) {
     const data = payload[0].payload;
-    // Find config to match color
     const moodConfig = MOOD_OPTIONS.find(m => m.label === data.mood);
-    // Convert bg-color to text-color for the tooltip text, roughly
-    const textColorClass = moodConfig 
-      ? moodConfig.color.replace('bg-', 'text-').replace('slate', 'gray') // simple mapping heuristic or just use the config color
-      : 'text-gray-800';
-
-    // Helper map for better text visibility if needed, or just rely on the bg class convention
-    // Let's use specific text colors based on the bg class prefix for better contrast
     let finalTextColor = 'text-gray-800';
     if (moodConfig?.color.includes('rose')) finalTextColor = 'text-rose-500';
     else if (moodConfig?.color.includes('amber')) finalTextColor = 'text-amber-500';
-    else if (moodConfig?.color.includes('sky')) finalTextColor = 'text-sky-500';
-    else if (moodConfig?.color.includes('slate')) finalTextColor = 'text-slate-500';
-    else if (moodConfig?.color.includes('indigo')) finalTextColor = 'text-indigo-500';
-    else if (moodConfig?.color.includes('red')) finalTextColor = 'text-red-500';
-    else if (moodConfig?.color.includes('gray')) finalTextColor = 'text-gray-600';
-
+    else if (moodConfig?.color.includes('emerald')) finalTextColor = 'text-emerald-500';
+    
     return (
-      <div className="bg-white px-4 py-3 rounded-xl shadow-[0_8px_30px_rgb(0,0,0,0.12)] border border-gray-100 text-left max-w-[220px]">
+      <div className="bg-white/90 backdrop-blur-md px-4 py-3 rounded-2xl shadow-xl border border-white/50 text-left max-w-[220px]">
         <p className="text-[10px] text-gray-400 mb-1.5 font-medium tracking-wide">{data.time}</p>
         <div className="flex items-center justify-between gap-3 mb-2">
            <span className={`text-base font-black ${finalTextColor}`}>
              {data.mood}
            </span>
-           <span className="text-xs font-bold text-white bg-indigo-500 px-2 py-0.5 rounded-md shadow-sm shadow-indigo-200">
+           <span className="text-xs font-bold text-white bg-gray-900 px-2 py-0.5 rounded-lg">
              {Number(data.score).toFixed(1)}
            </span>
         </div>
-        <p className="text-xs text-gray-600 line-clamp-3 leading-relaxed border-t border-gray-50 pt-2">
-            {data.content || "无详细内容"}
+        <p className="text-xs text-gray-600 line-clamp-2 leading-relaxed opacity-80">
+            {data.content || "..."}
         </p>
       </div>
     );
@@ -56,19 +44,16 @@ const Dashboard: React.FC<Props> = ({ entries }) => {
   const [analysis, setAnalysis] = useState<AIAnalysis | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [timeRange, setTimeRange] = useState<TimeRange>('today');
+  const [timeRange, setTimeRange] = useState<TimeRange>('week'); // Default changed to 'week'
 
-  // Filter entries based on selected time range
   const filteredEntries = useMemo(() => {
     const now = new Date();
     const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
     
-    // Start of week (Monday)
-    const dayOfWeek = now.getDay() || 7; // Treat Sunday as 7
+    const dayOfWeek = now.getDay() || 7; 
     const startOfWeek = new Date(startOfToday);
     startOfWeek.setDate(now.getDate() - dayOfWeek + 1);
     
-    // Start of month
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
 
     return entries.filter(e => {
@@ -86,8 +71,6 @@ const Dashboard: React.FC<Props> = ({ entries }) => {
     time: new Date(e.timestamp).toLocaleTimeString([], { 
       hour: '2-digit', 
       minute: '2-digit',
-      month: timeRange !== 'today' ? 'numeric' : undefined,
-      day: timeRange !== 'today' ? 'numeric' : undefined
     }),
     shortTime: timeRange === 'today' 
       ? new Date(e.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
@@ -105,29 +88,28 @@ const Dashboard: React.FC<Props> = ({ entries }) => {
       const result = await analyzeMoods(filteredEntries);
       setAnalysis(result);
     } catch (err) {
-      setError("AI 休息中，请稍后再试...");
+      setError("AI 正在深呼吸，请稍后再试...");
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="space-y-8 pb-20 animate-in fade-in slide-in-from-bottom-4 duration-500">
+    <div className="space-y-8 pb-32 animate-in fade-in slide-in-from-bottom-4 duration-500">
       
-      {/* Time Range Selector */}
       <div className="flex justify-center">
-        <div className="bg-gray-100 p-1 rounded-xl flex gap-1">
+        <div className="bg-white/40 backdrop-blur-md p-1.5 rounded-2xl flex gap-1 shadow-sm border border-white/40">
           {(['today', 'week', 'month'] as TimeRange[]).map((range) => (
             <button
               key={range}
               onClick={() => {
                 setTimeRange(range);
-                setAnalysis(null); // Clear previous analysis when range changes
+                setAnalysis(null);
               }}
-              className={`px-6 py-2 rounded-lg text-sm font-bold transition-all ${
+              className={`px-6 py-2 rounded-xl text-sm font-bold transition-all ${
                 timeRange === range
-                  ? 'bg-white text-indigo-600 shadow-sm'
-                  : 'text-gray-400 hover:text-gray-600'
+                  ? 'bg-white text-gray-800 shadow-sm scale-105'
+                  : 'text-gray-500 hover:text-gray-700'
               }`}
             >
               {range === 'today' ? '今天' : range === 'week' ? '本周' : '本月'}
@@ -136,47 +118,46 @@ const Dashboard: React.FC<Props> = ({ entries }) => {
         </div>
       </div>
 
-      <section className="bg-white rounded-3xl p-6 shadow-sm border border-gray-100">
-        <h3 className="text-lg font-bold text-gray-800 mb-6 flex items-center gap-2">
-          <ICONS.Chart /> 情绪波动曲线
+      <section className="glass-card rounded-[2.5rem] p-6">
+        <h3 className="text-lg font-bold text-gray-800 mb-6 flex items-center gap-2 pl-2">
+          <ICONS.Chart /> 情绪心电图
         </h3>
         
         {filteredEntries.length > 0 ? (
-          <div className="h-64 w-full -ml-4"> {/* Negative margin to accommodate Y-axis width visually */}
+          <div className="h-64 w-full -ml-2"> 
             <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={chartData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+              <AreaChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                 <defs>
                   <linearGradient id="colorScore" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#6366f1" stopOpacity={0.3}/>
-                    <stop offset="95%" stopColor="#6366f1" stopOpacity={0}/>
+                    <stop offset="5%" stopColor="#4f46e5" stopOpacity={0.2}/>
+                    <stop offset="95%" stopColor="#4f46e5" stopOpacity={0}/>
                   </linearGradient>
                 </defs>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(0,0,0,0.05)" />
                 <XAxis 
                   dataKey="shortTime" 
                   axisLine={false} 
                   tickLine={false} 
-                  tick={{fontSize: 10, fill: '#94a3b8'}} 
+                  tick={{fontSize: 10, fill: '#9ca3af'}} 
                   interval="preserveStartEnd"
-                  padding={{ left: 10, right: 10 }}
+                  padding={{ left: 20, right: 20 }}
                 />
                 <YAxis 
                   domain={[0, 10]} 
                   axisLine={false} 
                   tickLine={false} 
-                  tick={{fontSize: 10, fill: '#94a3b8', fontWeight: 500}} 
-                  ticks={[0, 2, 4, 6, 8, 10]}
-                  width={35}
+                  tick={{fontSize: 10, fill: '#9ca3af', fontWeight: 500}} 
+                  ticks={[0, 5, 10]}
+                  width={30}
                 />
                 <Tooltip 
                   content={<CustomTooltip />}
-                  cursor={{ stroke: '#6366f1', strokeWidth: 1.5, strokeDasharray: '4 4' }}
-                  isAnimationActive={false} // Improves performance on touch drag
+                  cursor={{ stroke: '#4f46e5', strokeWidth: 1, strokeDasharray: '4 4' }}
                 />
                 <Area 
                   type="monotone" 
                   dataKey="score" 
-                  stroke="#6366f1" 
+                  stroke="#4f46e5" 
                   strokeWidth={3} 
                   fillOpacity={1} 
                   fill="url(#colorScore)" 
@@ -187,92 +168,110 @@ const Dashboard: React.FC<Props> = ({ entries }) => {
           </div>
         ) : (
           <div className="h-64 flex flex-col items-center justify-center text-gray-300">
-            <div className="mb-2 text-4xl">📉</div>
-            <p className="text-sm">该时间段暂无记录</p>
+            <div className="mb-2 text-4xl opacity-50">📉</div>
+            <p className="text-sm font-medium">暂无数据轨迹</p>
           </div>
         )}
       </section>
 
       <section className="space-y-6">
-        <div className="flex justify-between items-center">
+        <div className="flex justify-between items-center px-2">
           <h3 className="text-lg font-bold text-gray-800 flex items-center gap-2">
-            <ICONS.Brain /> AI 人生教练建议
+            <ICONS.Brain /> 灵魂镜像
           </h3>
           <button 
             onClick={handleAnalyze}
             disabled={loading || filteredEntries.length === 0}
-            className={`px-6 py-2 rounded-full font-medium transition-all ${
+            className={`px-5 py-2.5 rounded-full font-bold text-sm transition-all ${
               loading || filteredEntries.length === 0
-                ? 'bg-gray-100 text-gray-400 cursor-not-allowed' 
-                : 'bg-indigo-600 text-white shadow-lg shadow-indigo-100 hover:bg-indigo-700'
+                ? 'bg-gray-200 text-gray-400 cursor-not-allowed' 
+                : 'bg-gray-900 text-white shadow-lg shadow-gray-400/30 hover:bg-black active:scale-95'
             }`}
           >
-            {loading ? '分析中...' : '生成智能分析'}
+            {loading ? '连接心灵中...' : '开始解读'}
           </button>
         </div>
 
         {error && (
-          <div className="p-4 bg-rose-50 text-rose-600 rounded-2xl text-sm border border-rose-100">
+          <div className="p-4 bg-rose-50/80 backdrop-blur text-rose-600 rounded-2xl text-sm border border-rose-100 text-center">
             {error}
           </div>
         )}
 
         {!analysis && !loading && (
-          <div className="text-center py-12 bg-gray-50 rounded-3xl border-2 border-dashed border-gray-200">
-            <p className="text-gray-400">选择时间范围并点击按钮<br/>让 AI 教练为您解读情绪轨迹</p>
+          <div className="text-center py-16 glass-card rounded-[2.5rem] border-dashed border-2 border-gray-300/50">
+            <p className="text-gray-400 font-medium">点击右上角按钮<br/>唤醒您的 AI 疗愈师</p>
           </div>
         )}
 
         {analysis && (
-          <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-700">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="bg-gradient-to-br from-indigo-50 to-blue-50 p-6 rounded-3xl border border-indigo-100 shadow-sm">
-                <p className="text-sm font-bold text-indigo-600 uppercase tracking-wider mb-2">心情晴雨表</p>
-                <p className="text-gray-700 leading-relaxed font-medium">{analysis.summary}</p>
-                <div className="mt-4 pt-4 border-t border-indigo-200/50 flex items-center gap-2">
-                  <span className={`px-2 py-1 rounded text-xs font-bold uppercase ${
-                    analysis.moodBarometer.trend === 'rising' ? 'bg-green-100 text-green-600' : 
-                    analysis.moodBarometer.trend === 'falling' ? 'bg-rose-100 text-rose-600' : 
-                    'bg-blue-100 text-blue-600'
-                  }`}>
-                    趋势: {analysis.moodBarometer.trend === 'rising' ? '回升' : analysis.moodBarometer.trend === 'falling' ? '波动' : '平稳'}
-                  </span>
-                  <span className="text-sm text-gray-600">{analysis.moodBarometer.explanation}</span>
+          <div className="space-y-6 animate-in fade-in slide-in-from-bottom-8 duration-700">
+            <div className="grid grid-cols-1 gap-6">
+              
+              {/* Main Insight Card */}
+              <div className="relative overflow-hidden rounded-[2.5rem] p-8 text-white shadow-xl shadow-indigo-200">
+                <div className="absolute inset-0 bg-gradient-to-br from-indigo-500 to-purple-600"></div>
+                <div className="absolute -right-10 -top-10 w-40 h-40 bg-white/20 rounded-full blur-3xl"></div>
+                <div className="relative z-10">
+                    <div className="flex items-center gap-3 mb-4 opacity-90">
+                        <span className="uppercase text-xs font-bold tracking-widest">总体状态</span>
+                        <div className="h-[1px] flex-1 bg-white/30"></div>
+                    </div>
+                    <p className="text-lg leading-relaxed font-medium text-white/95">
+                        {analysis.summary}
+                    </p>
+                    <div className="mt-6 flex items-center gap-3">
+                         <span className={`px-3 py-1.5 rounded-lg text-xs font-bold bg-white/20 backdrop-blur`}>
+                            趋势: {analysis.moodBarometer.trend === 'rising' ? '↗ 回升' : analysis.moodBarometer.trend === 'falling' ? '↘ 波动' : '→ 平稳'}
+                         </span>
+                         <span className="text-xs text-white/70">
+                            {analysis.moodBarometer.explanation}
+                         </span>
+                    </div>
                 </div>
               </div>
 
-              <div className="bg-gradient-to-br from-emerald-50 to-teal-50 p-6 rounded-3xl border border-emerald-100 shadow-sm">
-                <p className="text-sm font-bold text-emerald-600 uppercase tracking-wider mb-2">亮点记录</p>
-                <ul className="space-y-2">
-                  {analysis.peaks.map((p, i) => (
-                    <li key={i} className="flex items-start gap-2 text-gray-700 text-sm">
-                      <span className="text-emerald-500 mt-1">✨</span> {p}
-                    </li>
-                  ))}
-                </ul>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="bg-gradient-to-br from-emerald-50/80 to-teal-50/80 backdrop-blur-md p-6 rounded-[2rem] border border-white/50">
+                    <p className="text-sm font-bold text-emerald-600 uppercase tracking-wider mb-4 flex items-center gap-2">
+                        <span className="text-lg">✨</span> 高光时刻
+                    </p>
+                    <ul className="space-y-3">
+                      {analysis.peaks.map((p, i) => (
+                        <li key={i} className="flex items-start gap-3 text-gray-700 text-sm font-medium">
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 mt-1.5 flex-shrink-0"></span> {p}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+
+                  <div className="bg-gradient-to-br from-rose-50/80 to-orange-50/80 backdrop-blur-md p-6 rounded-[2rem] border border-white/50">
+                    <p className="text-sm font-bold text-rose-600 uppercase tracking-wider mb-4 flex items-center gap-2">
+                        <span className="text-lg">☁️</span> 需要呵护
+                    </p>
+                    <ul className="space-y-3">
+                      {analysis.valleys.map((v, i) => (
+                        <li key={i} className="flex items-start gap-3 text-gray-700 text-sm font-medium">
+                          <span className="w-1.5 h-1.5 rounded-full bg-rose-400 mt-1.5 flex-shrink-0"></span> {v}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
               </div>
             </div>
 
-            <div className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm">
-              <p className="text-sm font-bold text-gray-800 mb-4">来自教练的建议</p>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="glass-card p-8 rounded-[2.5rem]">
+              <p className="text-sm font-bold text-gray-800 mb-6 flex items-center gap-2">
+                 <span className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center">💌</span>
+                 给你的专属建议
+              </p>
+              <div className="space-y-4">
                 {analysis.suggestions.map((s, i) => (
-                  <div key={i} className="p-4 bg-gray-50 rounded-2xl text-sm text-gray-600 border border-gray-100 hover:border-indigo-200 transition-colors">
+                  <div key={i} className="p-5 bg-white/60 rounded-2xl text-sm text-gray-600 border border-white hover:border-indigo-100 transition-colors leading-relaxed shadow-sm">
                     {s}
                   </div>
                 ))}
               </div>
-            </div>
-
-            <div className="bg-rose-50/50 p-6 rounded-3xl border border-rose-100">
-              <p className="text-sm font-bold text-rose-600 mb-2">需要关注的低谷</p>
-              <ul className="space-y-2">
-                {analysis.valleys.map((v, i) => (
-                  <li key={i} className="text-sm text-gray-600 flex items-center gap-2">
-                    <span className="w-1.5 h-1.5 rounded-full bg-rose-400"></span> {v}
-                  </li>
-                ))}
-              </ul>
             </div>
           </div>
         )}
