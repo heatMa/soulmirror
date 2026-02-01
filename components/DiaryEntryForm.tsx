@@ -5,17 +5,42 @@ import { MOOD_OPTIONS, MoodOption } from '../constants';
 import { generateMoodMetadata } from '../services/geminiService';
 
 interface Props {
-  onSave: (entry: Omit<DiaryEntry, 'id' | 'timestamp'>) => void;
+  initialData?: DiaryEntry | null; // 支持传入已有数据进行编辑
+  onSave: (entry: Omit<DiaryEntry, 'id' | 'timestamp'> & { id?: string, timestamp?: number }) => void;
   onClose: () => void;
 }
 
-const DiaryEntryForm: React.FC<Props> = ({ onSave, onClose }) => {
+const DiaryEntryForm: React.FC<Props> = ({ initialData, onSave, onClose }) => {
   const [content, setContent] = useState('');
   const [selectedMood, setSelectedMood] = useState<MoodOption>(MOOD_OPTIONS[2]); 
   const [customMoods, setCustomMoods] = useState<MoodOption[]>([]);
   const [newMoodInput, setNewMoodInput] = useState('');
   const [isAddingMood, setIsAddingMood] = useState(false);
   const [isGeneratingTag, setIsGeneratingTag] = useState(false);
+
+  // 初始化数据（如果是编辑模式）
+  useEffect(() => {
+    if (initialData) {
+      setContent(initialData.content);
+      // 尝试查找匹配的心情，如果没有找到则创建一个临时的
+      const allMoods = [...MOOD_OPTIONS, ...customMoods];
+      const match = allMoods.find(m => m.label === initialData.mood);
+      if (match) {
+        setSelectedMood(match);
+      } else {
+        // Fallback or create temp mood object if custom mood was deleted
+        setSelectedMood({
+            label: initialData.mood,
+            value: initialData.mood,
+            score: initialData.moodScore,
+            emoji: '🏷️', 
+            color: 'bg-gray-400', 
+            shadow: 'shadow-gray-200', 
+            suggestions: []
+        });
+      }
+    }
+  }, [initialData, customMoods]);
 
   useEffect(() => {
     const saved = localStorage.getItem('soulmirror_custom_moods');
@@ -71,6 +96,8 @@ const DiaryEntryForm: React.FC<Props> = ({ onSave, onClose }) => {
     if (!content.trim()) return;
     
     onSave({
+      id: initialData?.id, // 如果是编辑，传回 ID
+      timestamp: initialData?.timestamp, // 如果是编辑，保留原时间戳
       content,
       mood: selectedMood.label,
       moodScore: selectedMood.score,
@@ -87,12 +114,12 @@ const DiaryEntryForm: React.FC<Props> = ({ onSave, onClose }) => {
         onClick={onClose}
       ></div>
 
-      <div className="bg-white/90 backdrop-blur-xl w-full rounded-t-[2.5rem] sm:rounded-[2.5rem] sm:max-w-lg shadow-[0_-10px_40px_-15px_rgba(0,0,0,0.1)] overflow-hidden animate-in slide-in-from-bottom duration-500 z-10 flex flex-col h-[92vh] sm:h-[85vh]">
+      <div className="bg-white/95 backdrop-blur-xl w-full rounded-t-[2.5rem] sm:rounded-[2.5rem] sm:max-w-lg shadow-[0_-10px_40px_-15px_rgba(0,0,0,0.1)] overflow-hidden animate-in slide-in-from-bottom duration-500 z-10 flex flex-col h-[92vh] sm:h-[85vh]">
         
-        <div className="p-6 flex justify-between items-center sticky top-0 z-20">
+        <div className="p-6 flex justify-between items-center sticky top-0 z-20 bg-white/50 backdrop-blur-sm">
           <div>
-            <h2 className="text-xl font-bold text-gray-800">此刻的心情</h2>
-            <p className="text-xs text-gray-400 mt-0.5">诚实面对自己的内心</p>
+            <h2 className="text-xl font-bold text-gray-800">{initialData ? '修改日记' : '此刻的心情'}</h2>
+            <p className="text-xs text-gray-400 mt-0.5">{initialData ? '记忆是可以被重新书写的' : '诚实面对自己的内心'}</p>
           </div>
           <button onClick={onClose} className="p-2.5 bg-gray-100/50 rounded-full text-gray-500 hover:bg-gray-100 transition-colors">
             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -178,7 +205,7 @@ const DiaryEntryForm: React.FC<Props> = ({ onSave, onClose }) => {
               value={content}
               onChange={(e) => setContent(e.target.value)}
               placeholder="在这里写下你的思绪，无论是开心还是难过，我都会倾听..."
-              className="w-full h-56 p-6 bg-white border-none rounded-3xl shadow-[inset_0_2px_10px_rgba(0,0,0,0.03)] focus:shadow-[inset_0_2px_15px_rgba(0,0,0,0.05)] focus:ring-0 transition-all resize-none text-gray-700 text-lg leading-relaxed outline-none placeholder:text-gray-300"
+              className="w-full h-64 p-6 bg-white border-none rounded-3xl shadow-[inset_0_2px_10px_rgba(0,0,0,0.03)] focus:shadow-[inset_0_2px_15px_rgba(0,0,0,0.05)] focus:ring-0 transition-all resize-none text-gray-700 text-lg leading-relaxed outline-none placeholder:text-gray-300"
             />
           </div>
         </form>
@@ -188,7 +215,7 @@ const DiaryEntryForm: React.FC<Props> = ({ onSave, onClose }) => {
             onClick={handleSubmit}
             className={`w-full py-4 font-bold rounded-2xl shadow-lg shadow-indigo-200/50 transition-all active:scale-95 text-lg flex items-center justify-center gap-2 text-white bg-gray-900 hover:bg-black`}
           >
-            记录这一刻
+            {initialData ? '保存修改' : '记录这一刻'}
           </button>
         </div>
       </div>

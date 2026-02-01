@@ -9,6 +9,7 @@ export interface DiaryEntry {
 }
 
 export interface AIAnalysis {
+  keyword: string; // New: A single character or word describing the period
   summary: string;
   moodBarometer: {
     period: string;
