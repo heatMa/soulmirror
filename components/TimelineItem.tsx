@@ -28,14 +28,11 @@ const TimelineItem: React.FC<Props> = ({ entry, moodConfig, isLast, onEdit }) =>
     <div className="flex gap-4 relative">
       {/* Left Timeline Line */}
       <div className="flex flex-col items-center">
-        {/* The Icon Node */}
-        <div className={`z-10 w-4 h-4 mt-1 rounded-full flex items-center justify-center text-[10px] shadow-sm ${getTextColor()}`}>
-           {/* 使用简单的 Font Awesome 风格的心形，或者直接用 Emoji 如果 moodConfig 没有 heart */}
-           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4">
-             <path d="m11.645 20.91-.007-.003-.022-.012a15.247 15.247 0 0 1-.383-.218 25.18 25.18 0 0 1-4.244-3.17C4.688 15.36 2.25 12.174 2.25 8.25 2.25 5.322 4.714 3 7.688 3A5.5 5.5 0 0 1 12 5.052 5.5 5.5 0 0 1 16.313 3c2.973 0 5.437 2.322 5.437 5.25 0 3.925-2.438 7.111-4.739 9.256a25.175 25.175 0 0 1-4.244 3.17 15.247 15.247 0 0 1-.383.219l-.022.012-.007.004-.003.001a.752.752 0 0 1-.704 0l-.003-.001Z" />
-           </svg>
+        {/* The Emoji Node */}
+        <div className="z-10 w-6 h-6 mt-1 flex items-center justify-center text-base">
+           {moodConfig.emoji}
         </div>
-        
+
         {/* The Vertical Line */}
         {!isLast && (
           <div className="flex-1 w-[2px] bg-emerald-100/80 my-1 rounded-full"></div>
@@ -71,13 +68,14 @@ const TimelineItem: React.FC<Props> = ({ entry, moodConfig, isLast, onEdit }) =>
          </div>
 
          {/* Content Body */}
-         <div 
+         <div
            className="text-gray-600 text-[15px] leading-7 font-medium cursor-pointer"
            onClick={() => setIsExpanded(!isExpanded)}
          >
-            <div className={`transition-all duration-300 whitespace-pre-wrap ${!isExpanded ? 'line-clamp-2' : ''}`}>
-               {entry.content}
-            </div>
+            <div
+              className={`transition-all duration-300 ${!isExpanded ? 'line-clamp-2' : ''}`}
+              dangerouslySetInnerHTML={{ __html: entry.content }}
+            />
             {!isExpanded && (
                <div className="text-xs text-emerald-500 font-bold mt-1">展开全文</div>
             )}

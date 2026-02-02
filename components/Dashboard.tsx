@@ -1,12 +1,14 @@
 
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { DiaryEntry, AIAnalysis } from '../types';
+import { DiaryEntry, AIAnalysis, BackupData, ImportResult } from '../types';
 import { analyzeMoods } from '../services/geminiService';
+import { databaseService } from '../services/databaseService';
 import { ICONS, MOOD_OPTIONS, MoodOption } from '../constants';
 
 interface Props {
   entries: DiaryEntry[];
+  onDataRestored?: () => void; // 数据恢复后的回调
 }
 
 type TimeRange = 'today' | 'yesterday' | 'week' | 'month';
@@ -40,16 +42,23 @@ const CustomTooltip = ({ active, payload, label }: any) => {
   return null;
 };
 
-const Dashboard: React.FC<Props> = ({ entries }) => {
+const Dashboard: React.FC<Props> = ({ entries, onDataRestored }) => {
   const [analysis, setAnalysis] = useState<AIAnalysis | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [timeRange, setTimeRange] = useState<TimeRange>('today'); 
+  const [timeRange, setTimeRange] = useState<TimeRange>('today');
   const [customMoods, setCustomMoods] = useState<MoodOption[]>([]);
 
   // Search & Filter State
   const [activeTag, setActiveTag] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
+
+  // Backup & Restore State
+  const [showRestoreDialog, setShowRestoreDialog] = useState(false);
+  const [pendingBackupData, setPendingBackupData] = useState<BackupData | null>(null);
+  const [restoreStatus, setRestoreStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
+  const [restoreMessage, setRestoreMessage] = useState('');
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Load custom moods for color mapping
   useEffect(() => {
@@ -188,6 +197,103 @@ const Dashboard: React.FC<Props> = ({ entries }) => {
     link.download = `soulmirror_export_${rangeType}_${now.toISOString().split('T')[0]}.txt`;
     link.click();
     URL.revokeObjectURL(url);
+  };
+
+  // 备份所有数据
+  const handleBackup = async () => {
+    try {
+      const backupData = await databaseService.exportAllData();
+      const jsonStr = JSON.stringify(backupData, null, 2);
+      const blob = new Blob([jsonStr], { type: 'application/json;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      const date = new Date().toISOString().split('T')[0];
+      link.download = `soulmirror_backup_${date}.json`;
+      link.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      alert('备份失败，请重试');
+      console.error('备份失败:', err);
+    }
+  };
+
+  // 触发文件选择
+  const handleRestoreClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  // 处理文件选择
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // 重置文件输入
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+
+    try {
+      const text = await file.text();
+      const data = JSON.parse(text) as BackupData;
+
+      // 验证基本格式
+      if (!data.version || !data.data) {
+        alert('无效的备份文件格式');
+        return;
+      }
+
+      // 显示确认对话框
+      setPendingBackupData(data);
+      setShowRestoreDialog(true);
+      setRestoreStatus('idle');
+      setRestoreMessage('');
+    } catch (err) {
+      alert('无法解析备份文件，请确保选择正确的 JSON 文件');
+      console.error('解析备份文件失败:', err);
+    }
+  };
+
+  // 执行恢复
+  const handleConfirmRestore = async () => {
+    if (!pendingBackupData) return;
+
+    setRestoreStatus('loading');
+    setRestoreMessage('正在恢复数据...');
+
+    try {
+      const result = await databaseService.importAllData(pendingBackupData);
+
+      if (result.success) {
+        setRestoreStatus('success');
+        setRestoreMessage(
+          `恢复成功！导入了 ${result.entriesImported} 条日记、${result.notesImported} 条笔记、${result.moodsImported} 个自定义心情`
+        );
+        // 延迟后关闭对话框并刷新数据
+        setTimeout(() => {
+          setShowRestoreDialog(false);
+          setPendingBackupData(null);
+          onDataRestored?.();
+        }, 2000);
+      } else {
+        setRestoreStatus('error');
+        setRestoreMessage(
+          `部分数据恢复成功：${result.entriesImported} 条日记、${result.notesImported} 条笔记、${result.moodsImported} 个自定义心情。\n错误: ${result.errors.join(', ')}`
+        );
+      }
+    } catch (err) {
+      setRestoreStatus('error');
+      setRestoreMessage('恢复失败，请重试');
+      console.error('恢复失败:', err);
+    }
+  };
+
+  // 关闭恢复对话框
+  const handleCancelRestore = () => {
+    setShowRestoreDialog(false);
+    setPendingBackupData(null);
+    setRestoreStatus('idle');
+    setRestoreMessage('');
   };
 
   return (
@@ -401,34 +507,63 @@ const Dashboard: React.FC<Props> = ({ entries }) => {
                </span>
             </div>
 
-            {/* Export Actions */}
-            <div className="flex items-center bg-white/60 backdrop-blur-sm p-1 rounded-xl border border-white/60 shadow-sm">
-              <div className="flex items-center px-2 text-gray-400 gap-1 border-r border-gray-200 mr-1">
-                 <ICONS.Download />
-                 <span className="text-[10px] font-bold uppercase tracking-wider hidden sm:inline">导出</span>
+            {/* Export & Backup Actions */}
+            <div className="flex items-center gap-2">
+              {/* Backup/Restore Buttons */}
+              <div className="flex items-center bg-white/60 backdrop-blur-sm p-1 rounded-xl border border-white/60 shadow-sm">
+                <div className="flex items-center px-2 text-gray-400 gap-1 border-r border-gray-200 mr-1">
+                   <ICONS.Backup />
+                   <span className="text-[10px] font-bold uppercase tracking-wider hidden sm:inline">数据</span>
+                </div>
+                <div className="flex gap-1">
+                   <button
+                     onClick={handleBackup}
+                     className="px-2.5 py-1 text-[10px] font-bold text-gray-600 hover:bg-white hover:text-gray-900 rounded-lg transition-colors flex items-center gap-1"
+                     title="备份所有数据"
+                   >
+                     <ICONS.Download />
+                     <span className="hidden sm:inline">备份</span>
+                   </button>
+                   <button
+                     onClick={handleRestoreClick}
+                     className="px-2.5 py-1 text-[10px] font-bold text-gray-600 hover:bg-white hover:text-gray-900 rounded-lg transition-colors flex items-center gap-1"
+                     title="从备份文件恢复"
+                   >
+                     <ICONS.Upload />
+                     <span className="hidden sm:inline">恢复</span>
+                   </button>
+                </div>
               </div>
-              <div className="flex gap-1">
-                 <button 
-                   onClick={() => handleExport('today')} 
-                   className="px-2.5 py-1 text-[10px] font-bold text-gray-600 hover:bg-white hover:text-gray-900 rounded-lg transition-colors"
-                   title="导出过去1天的记录"
-                 >
-                   1天
-                 </button>
-                 <button 
-                   onClick={() => handleExport('week')} 
-                   className="px-2.5 py-1 text-[10px] font-bold text-gray-600 hover:bg-white hover:text-gray-900 rounded-lg transition-colors"
-                   title="导出过去1周的记录"
-                 >
-                   1周
-                 </button>
-                 <button 
-                   onClick={() => handleExport('month')} 
-                   className="px-2.5 py-1 text-[10px] font-bold text-gray-600 hover:bg-white hover:text-gray-900 rounded-lg transition-colors"
-                   title="导出过去1个月的记录"
-                 >
-                   1月
-                 </button>
+
+              {/* Export Actions */}
+              <div className="flex items-center bg-white/60 backdrop-blur-sm p-1 rounded-xl border border-white/60 shadow-sm">
+                <div className="flex items-center px-2 text-gray-400 gap-1 border-r border-gray-200 mr-1">
+                   <ICONS.Download />
+                   <span className="text-[10px] font-bold uppercase tracking-wider hidden sm:inline">导出</span>
+                </div>
+                <div className="flex gap-1">
+                   <button
+                     onClick={() => handleExport('today')}
+                     className="px-2.5 py-1 text-[10px] font-bold text-gray-600 hover:bg-white hover:text-gray-900 rounded-lg transition-colors"
+                     title="导出过去1天的记录"
+                   >
+                     1天
+                   </button>
+                   <button
+                     onClick={() => handleExport('week')}
+                     className="px-2.5 py-1 text-[10px] font-bold text-gray-600 hover:bg-white hover:text-gray-900 rounded-lg transition-colors"
+                     title="导出过去1周的记录"
+                   >
+                     1周
+                   </button>
+                   <button
+                     onClick={() => handleExport('month')}
+                     className="px-2.5 py-1 text-[10px] font-bold text-gray-600 hover:bg-white hover:text-gray-900 rounded-lg transition-colors"
+                     title="导出过去1个月的记录"
+                   >
+                     1月
+                   </button>
+                </div>
               </div>
             </div>
          </div>
@@ -538,6 +673,104 @@ const Dashboard: React.FC<Props> = ({ entries }) => {
             )}
          </div>
       </section>
+
+      {/* Hidden file input for restore */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept=".json"
+        onChange={handleFileSelect}
+        className="hidden"
+      />
+
+      {/* Restore Confirmation Dialog */}
+      {showRestoreDialog && pendingBackupData && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-3xl p-6 max-w-md w-full shadow-2xl animate-in zoom-in-95 duration-200">
+            <h3 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
+              <ICONS.Upload /> 恢复数据确认
+            </h3>
+
+            {restoreStatus === 'idle' && (
+              <>
+                <div className="bg-gray-50 rounded-2xl p-4 mb-4 space-y-2">
+                  <p className="text-sm text-gray-600">
+                    <span className="font-medium">备份时间:</span>{' '}
+                    {new Date(pendingBackupData.exportDate).toLocaleString('zh-CN')}
+                  </p>
+                  <p className="text-sm text-gray-600">
+                    <span className="font-medium">来源平台:</span>{' '}
+                    {pendingBackupData.platform === 'sqlite' ? 'SQLite (移动端)' : 'localStorage (浏览器)'}
+                  </p>
+                  <div className="border-t border-gray-200 pt-2 mt-2">
+                    <p className="text-sm text-gray-600">
+                      <span className="font-medium">日记条目:</span>{' '}
+                      {pendingBackupData.data.entries?.length || 0} 条
+                    </p>
+                    <p className="text-sm text-gray-600">
+                      <span className="font-medium">每日笔记:</span>{' '}
+                      {Object.keys(pendingBackupData.data.dailyNotes || {}).length} 条
+                    </p>
+                    <p className="text-sm text-gray-600">
+                      <span className="font-medium">自定义心情:</span>{' '}
+                      {pendingBackupData.data.customMoods?.length || 0} 个
+                    </p>
+                  </div>
+                </div>
+
+                <p className="text-xs text-amber-600 bg-amber-50 rounded-xl p-3 mb-4">
+                  注意：相同 ID 的条目将被备份数据覆盖，新条目将被添加。
+                </p>
+
+                <div className="flex gap-3">
+                  <button
+                    onClick={handleCancelRestore}
+                    className="flex-1 px-4 py-3 rounded-xl font-bold text-sm bg-gray-100 text-gray-600 hover:bg-gray-200 transition-colors"
+                  >
+                    取消
+                  </button>
+                  <button
+                    onClick={handleConfirmRestore}
+                    className="flex-1 px-4 py-3 rounded-xl font-bold text-sm bg-indigo-500 text-white hover:bg-indigo-600 transition-colors"
+                  >
+                    确认恢复
+                  </button>
+                </div>
+              </>
+            )}
+
+            {restoreStatus === 'loading' && (
+              <div className="text-center py-8">
+                <div className="animate-spin w-8 h-8 border-4 border-indigo-500 border-t-transparent rounded-full mx-auto mb-4"></div>
+                <p className="text-sm text-gray-600">{restoreMessage}</p>
+              </div>
+            )}
+
+            {restoreStatus === 'success' && (
+              <div className="text-center py-8">
+                <div className="w-16 h-16 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <ICONS.Check />
+                </div>
+                <p className="text-sm text-emerald-600 font-medium">{restoreMessage}</p>
+              </div>
+            )}
+
+            {restoreStatus === 'error' && (
+              <div className="py-4">
+                <div className="bg-rose-50 rounded-xl p-4 mb-4">
+                  <p className="text-sm text-rose-600 whitespace-pre-wrap">{restoreMessage}</p>
+                </div>
+                <button
+                  onClick={handleCancelRestore}
+                  className="w-full px-4 py-3 rounded-xl font-bold text-sm bg-gray-100 text-gray-600 hover:bg-gray-200 transition-colors"
+                >
+                  关闭
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 };

@@ -66,6 +66,15 @@ const App: React.FC = () => {
     }
   }, [showAddForm]);
 
+  // 关闭表单后也刷新自定义心情（确保新添加的心情能正确显示）
+  useEffect(() => {
+    if (!showAddForm) {
+      databaseService.getCustomMoods()
+        .then(setCustomMoods)
+        .catch(console.error);
+    }
+  }, [showAddForm]);
+
   // 设置问候语
   useEffect(() => {
     const hour = new Date().getHours();
@@ -171,13 +180,29 @@ const App: React.FC = () => {
     }
   }, []);
 
+  // 数据恢复后重新加载所有数据
+  const handleDataRestored = useCallback(async () => {
+    try {
+      const [loadedEntries, loadedNotes, loadedCustomMoods] = await Promise.all([
+        databaseService.getAllEntries(),
+        databaseService.getAllDailyNotes(),
+        databaseService.getCustomMoods()
+      ]);
+      setEntries(loadedEntries);
+      setDailyNotes(loadedNotes);
+      setCustomMoods(loadedCustomMoods);
+    } catch (error) {
+      console.error('刷新数据失败:', error);
+    }
+  }, []);
+
   const getMoodConfig = (moodLabel: string) => {
     return MOOD_OPTIONS.find(m => m.label === moodLabel) || 
            customMoods.find(m => m.label === moodLabel) || 
            MOOD_OPTIONS[2];
   };
 
-  // 按时间升序排序用于时间线视图
+  // 按时间降序排序用于时间线视图（最新的在最上面）
   const timelineEntries = entries
     .filter(entry => {
       const entryDate = new Date(entry.timestamp);
@@ -185,7 +210,7 @@ const App: React.FC = () => {
              entryDate.getMonth() === selectedDate.getMonth() &&
              entryDate.getFullYear() === selectedDate.getFullYear();
     })
-    .sort((a, b) => a.timestamp - b.timestamp);
+    .sort((a, b) => b.timestamp - a.timestamp);
 
   const getSelectedDateStr = () => {
     return selectedDate.toLocaleDateString('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit' }).replace(/\//g, '-');
@@ -338,7 +363,7 @@ const App: React.FC = () => {
            <div className="flex justify-between items-center mb-6 px-2">
               <h2 className="text-2xl font-bold text-gray-800 tracking-tight">AI 情绪洞察</h2>
            </div>
-          <Dashboard entries={entries} />
+          <Dashboard entries={entries} onDataRestored={handleDataRestored} />
         </div>
       )}
 

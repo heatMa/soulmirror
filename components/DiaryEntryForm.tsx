@@ -1,41 +1,55 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { DiaryEntry } from '../types';
-import { MOOD_OPTIONS, MoodOption } from '../constants';
+import { MOOD_OPTIONS, MoodOption, ICONS } from '../constants';
 import { generateMoodMetadata } from '../services/geminiService';
 
 interface Props {
-  initialData?: DiaryEntry | null; // 支持传入已有数据进行编辑
+  initialData?: DiaryEntry | null;
   onSave: (entry: Omit<DiaryEntry, 'id' | 'timestamp'> & { id?: string, timestamp?: number }) => void;
   onClose: () => void;
 }
 
+// 富文本颜色选项
+const TEXT_COLORS = [
+  { value: '#374151', label: '默认', borderClass: 'border-gray-700' },
+  { value: '#64748b', label: '蓝灰', borderClass: 'border-slate-500' },
+  { value: '#ef4444', label: '红色', borderClass: 'border-red-500' },
+  { value: '#84cc16', label: '绿色', borderClass: 'border-lime-500' },
+  { value: '#3b82f6', label: '蓝色', borderClass: 'border-blue-500' },
+  { value: '#f97316', label: '橙色', borderClass: 'border-orange-500' },
+  { value: '#8b5cf6', label: '紫色', borderClass: 'border-violet-500' },
+];
+
 const DiaryEntryForm: React.FC<Props> = ({ initialData, onSave, onClose }) => {
-  const [content, setContent] = useState('');
-  const [selectedMood, setSelectedMood] = useState<MoodOption>(MOOD_OPTIONS[2]); 
+  const [selectedMood, setSelectedMood] = useState<MoodOption>(MOOD_OPTIONS[2]);
   const [customMoods, setCustomMoods] = useState<MoodOption[]>([]);
   const [newMoodInput, setNewMoodInput] = useState('');
   const [isAddingMood, setIsAddingMood] = useState(false);
   const [isGeneratingTag, setIsGeneratingTag] = useState(false);
+  const [activeColor, setActiveColor] = useState<string>('#374151');
+  const contentRef = useRef<HTMLDivElement>(null);
 
   // 初始化数据（如果是编辑模式）
   useEffect(() => {
     if (initialData) {
-      setContent(initialData.content);
+      // 设置富文本内容
+      if (contentRef.current) {
+        contentRef.current.innerHTML = initialData.content || '';
+      }
       // 尝试查找匹配的心情，如果没有找到则创建一个临时的
       const allMoods = [...MOOD_OPTIONS, ...customMoods];
       const match = allMoods.find(m => m.label === initialData.mood);
       if (match) {
         setSelectedMood(match);
       } else {
-        // Fallback or create temp mood object if custom mood was deleted
         setSelectedMood({
             label: initialData.mood,
             value: initialData.mood,
             score: initialData.moodScore,
-            emoji: '🏷️', 
-            color: 'bg-gray-400', 
-            shadow: 'shadow-gray-200', 
+            emoji: '🏷️',
+            color: 'bg-gray-400',
+            shadow: 'shadow-gray-200',
             suggestions: []
         });
       }
@@ -93,18 +107,30 @@ const DiaryEntryForm: React.FC<Props> = ({ initialData, onSave, onClose }) => {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!content.trim()) return;
-    
+    const content = contentRef.current?.innerHTML || '';
+    if (!content.trim() || content === '<br>') return;
+
     onSave({
-      id: initialData?.id, // 如果是编辑，传回 ID
-      timestamp: initialData?.timestamp, // 如果是编辑，保留原时间戳
+      id: initialData?.id,
+      timestamp: initialData?.timestamp,
       content,
       mood: selectedMood.label,
       moodScore: selectedMood.score,
       tags: [selectedMood.label]
     });
-    
+
     onClose();
+  };
+
+  // 富文本命令执行
+  const executeCommand = (command: string, value: string | undefined = undefined) => {
+    document.execCommand(command, false, value);
+    if (contentRef.current) {
+      contentRef.current.focus();
+    }
+    if (command === 'foreColor' && value) {
+      setActiveColor(value);
+    }
   };
 
   return (
@@ -199,13 +225,73 @@ const DiaryEntryForm: React.FC<Props> = ({ initialData, onSave, onClose }) => {
             {isGeneratingTag && <p className="text-xs text-center text-gray-400 animate-pulse">正在为您定制专属情绪色彩...</p>}
           </div>
 
-          <div className="space-y-4">
-            <textarea
-              required
-              value={content}
-              onChange={(e) => setContent(e.target.value)}
-              placeholder="在这里写下你的思绪，无论是开心还是难过，我都会倾听..."
-              className="w-full h-64 p-6 bg-white border-none rounded-3xl shadow-[inset_0_2px_10px_rgba(0,0,0,0.03)] focus:shadow-[inset_0_2px_15px_rgba(0,0,0,0.05)] focus:ring-0 transition-all resize-none text-gray-700 text-lg leading-relaxed outline-none placeholder:text-gray-300"
+          <div className="space-y-3">
+            {/* 富文本工具栏 */}
+            <div className="flex items-center justify-between bg-white/60 rounded-2xl px-3 py-2">
+              <div className="flex items-center gap-1">
+                <button
+                  type="button"
+                  onMouseDown={(e) => { e.preventDefault(); executeCommand('undo'); }}
+                  className="p-1.5 text-emerald-500 hover:bg-emerald-50 rounded-lg transition-colors"
+                  title="撤销"
+                >
+                  <ICONS.Undo />
+                </button>
+                <div className="w-[1px] h-4 bg-gray-200 mx-1"></div>
+                <button
+                  type="button"
+                  onMouseDown={(e) => { e.preventDefault(); executeCommand('bold'); }}
+                  className="p-1.5 text-gray-400 hover:text-gray-800 hover:bg-gray-100 rounded-lg transition-colors"
+                  title="加粗"
+                >
+                  <ICONS.Bold />
+                </button>
+                <button
+                  type="button"
+                  onMouseDown={(e) => { e.preventDefault(); executeCommand('italic'); }}
+                  className="p-1.5 text-gray-400 hover:text-gray-800 hover:bg-gray-100 rounded-lg transition-colors"
+                  title="斜体"
+                >
+                  <ICONS.Italic />
+                </button>
+                <button
+                  type="button"
+                  onMouseDown={(e) => { e.preventDefault(); executeCommand('insertUnorderedList'); }}
+                  className="p-1.5 text-gray-400 hover:text-gray-800 hover:bg-gray-100 rounded-lg transition-colors"
+                  title="列表"
+                >
+                  <ICONS.List />
+                </button>
+              </div>
+
+              {/* 颜色选择 */}
+              <div className="flex items-center gap-2">
+                {TEXT_COLORS.map((color) => (
+                  <button
+                    key={color.value}
+                    type="button"
+                    onMouseDown={(e) => {
+                      e.preventDefault();
+                      executeCommand('foreColor', color.value);
+                    }}
+                    className={`w-5 h-5 rounded-full border-2 bg-white flex items-center justify-center flex-shrink-0 transition-transform active:scale-95 ${color.borderClass} ${activeColor === color.value ? 'ring-2 ring-offset-1 ring-gray-200' : ''}`}
+                    title={color.label}
+                  >
+                    {activeColor === color.value && (
+                      <div className="w-1.5 h-1.5 rounded-full" style={{backgroundColor: color.value}}></div>
+                    )}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* 富文本编辑区域 */}
+            <div
+              ref={contentRef}
+              contentEditable
+              className="w-full h-64 p-6 bg-white rounded-3xl shadow-[inset_0_2px_10px_rgba(0,0,0,0.03)] focus:shadow-[inset_0_2px_15px_rgba(0,0,0,0.05)] transition-all text-gray-700 text-lg leading-relaxed outline-none overflow-y-auto empty:before:content-[attr(data-placeholder)] empty:before:text-gray-300"
+              data-placeholder="在这里写下你的思绪，无论是开心还是难过，我都会倾听..."
+              style={{ whiteSpace: 'pre-wrap' }}
             />
           </div>
         </form>

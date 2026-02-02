@@ -1,6 +1,6 @@
 import { CapacitorSQLite, SQLiteConnection, SQLiteDBConnection } from '@capacitor-community/sqlite';
 import { Capacitor } from '@capacitor/core';
-import { DiaryEntry } from '../types';
+import { DiaryEntry, BackupData, ImportResult } from '../types';
 import { MoodOption } from '../constants';
 
 // 数据库名称和版本
@@ -368,6 +368,132 @@ class DatabaseService {
    */
   getStorageType(): 'sqlite' | 'localStorage' {
     return this.isNative ? 'sqlite' : 'localStorage';
+  }
+
+  // ==================== 备份与恢复操作 ====================
+
+  /**
+   * 导出所有数据为备份格式
+   */
+  async exportAllData(): Promise<BackupData> {
+    await this.ensureInitialized();
+
+    const entries = await this.getAllEntries();
+    const dailyNotes = await this.getAllDailyNotes();
+    const customMoods = await this.getCustomMoods();
+
+    return {
+      version: '1.0',
+      exportDate: new Date().toISOString(),
+      platform: this.getStorageType(),
+      data: {
+        entries,
+        dailyNotes,
+        customMoods
+      }
+    };
+  }
+
+  /**
+   * 从备份数据导入（覆盖模式：相同ID的条目将被替换）
+   */
+  async importAllData(backupData: BackupData): Promise<ImportResult> {
+    await this.ensureInitialized();
+
+    const result: ImportResult = {
+      success: false,
+      entriesImported: 0,
+      notesImported: 0,
+      moodsImported: 0,
+      errors: []
+    };
+
+    try {
+      // 验证备份数据格式
+      if (!backupData.version || !backupData.data) {
+        result.errors.push('无效的备份文件格式');
+        return result;
+      }
+
+      // 导入日记条目
+      if (backupData.data.entries && Array.isArray(backupData.data.entries)) {
+        for (const entry of backupData.data.entries) {
+          try {
+            if (this.isNative && this.db) {
+              // SQLite: 使用 INSERT OR REPLACE
+              await this.db.run(
+                `INSERT OR REPLACE INTO diary_entries (id, timestamp, mood, mood_score, content, tags)
+                 VALUES (?, ?, ?, ?, ?, ?)`,
+                [entry.id, entry.timestamp, entry.mood, entry.moodScore, entry.content, JSON.stringify(entry.tags)]
+              );
+            } else {
+              // localStorage: 合并条目
+              const existingEntries = await this.getAllEntries();
+              const index = existingEntries.findIndex(e => e.id === entry.id);
+              if (index !== -1) {
+                existingEntries[index] = entry;
+              } else {
+                existingEntries.push(entry);
+              }
+              // 按时间戳排序（降序）
+              existingEntries.sort((a, b) => b.timestamp - a.timestamp);
+              localStorage.setItem(STORAGE_KEYS.ENTRIES, JSON.stringify(existingEntries));
+            }
+            result.entriesImported++;
+          } catch (err) {
+            result.errors.push(`导入日记条目失败: ${entry.id}`);
+          }
+        }
+      }
+
+      // 导入每日笔记
+      if (backupData.data.dailyNotes && typeof backupData.data.dailyNotes === 'object') {
+        const noteEntries = Object.entries(backupData.data.dailyNotes);
+        for (const [dateStr, content] of noteEntries) {
+          try {
+            await this.saveDailyNote(dateStr, content);
+            result.notesImported++;
+          } catch (err) {
+            result.errors.push(`导入笔记失败: ${dateStr}`);
+          }
+        }
+      }
+
+      // 导入自定义心情
+      if (backupData.data.customMoods && Array.isArray(backupData.data.customMoods)) {
+        for (const mood of backupData.data.customMoods) {
+          try {
+            await this.saveCustomMood(mood);
+            result.moodsImported++;
+          } catch (err) {
+            result.errors.push(`导入自定义心情失败: ${mood.label}`);
+          }
+        }
+      }
+
+      result.success = result.errors.length === 0;
+      return result;
+    } catch (error) {
+      result.errors.push(`导入过程发生错误: ${error}`);
+      return result;
+    }
+  }
+
+  /**
+   * 清空所有数据
+   */
+  async clearAllData(): Promise<void> {
+    await this.ensureInitialized();
+
+    if (this.isNative && this.db) {
+      await this.db.execute('DELETE FROM diary_entries');
+      await this.db.execute('DELETE FROM daily_notes');
+      await this.db.execute('DELETE FROM custom_moods');
+    } else {
+      localStorage.removeItem(STORAGE_KEYS.ENTRIES);
+      localStorage.removeItem(STORAGE_KEYS.NOTES);
+      localStorage.removeItem(STORAGE_KEYS.CUSTOM_MOODS);
+    }
   }
 }
 

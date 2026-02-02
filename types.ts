@@ -25,3 +25,24 @@ export enum ViewMode {
   TIMELINE = 'timeline',
   ANALYSIS = 'analysis'
 }
+
+// 备份数据接口
+export interface BackupData {
+  version: string;
+  exportDate: string;
+  platform: 'sqlite' | 'localStorage';
+  data: {
+    entries: DiaryEntry[];
+    dailyNotes: Record<string, string>;
+    customMoods: import('./constants').MoodOption[];
+  };
+}
+
+// 导入结果接口
+export interface ImportResult {
+  success: boolean;
+  entriesImported: number;
+  notesImported: number;
+  moodsImported: number;
+  errors: string[];
+}
