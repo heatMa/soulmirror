@@ -76,6 +76,19 @@ const DiaryEntryForm: React.FC<Props> = ({ initialData, onSave, onClose }) => {
     localStorage.setItem('soulmirror_custom_moods', JSON.stringify(updated));
   };
 
+  const deleteCustomMood = (label: string) => {
+    if (!confirm(`确定要删除心情「${label}」吗？\n\n删除后，使用该心情的历史记录不受影响。`)) {
+      return;
+    }
+    const updated = customMoods.filter(m => m.label !== label);
+    setCustomMoods(updated);
+    localStorage.setItem('soulmirror_custom_moods', JSON.stringify(updated));
+    // 如果当前选中的是被删除的心情，切换到默认心情
+    if (selectedMood.label === label) {
+      setSelectedMood(MOOD_OPTIONS[0]);
+    }
+  };
+
   const handleAddNewMood = async (e?: React.FormEvent) => {
     e?.preventDefault();
     const trimmed = newMoodInput.trim();
@@ -116,6 +129,7 @@ const DiaryEntryForm: React.FC<Props> = ({ initialData, onSave, onClose }) => {
       content,
       mood: selectedMood.label,
       moodScore: selectedMood.score,
+      moodEmoji: selectedMood.emoji,
       tags: [selectedMood.label]
     });
 
@@ -175,19 +189,34 @@ const DiaryEntryForm: React.FC<Props> = ({ initialData, onSave, onClose }) => {
               ))}
 
               {customMoods.map((m) => (
-                <button
-                  key={m.value}
-                  type="button"
-                  onClick={() => setSelectedMood(m)}
-                  className={`px-4 py-3 rounded-2xl flex flex-col items-center justify-center gap-1 transition-all duration-300 border min-w-[70px] ${
-                    selectedMood.label === m.label
-                      ? `bg-gray-800 border-gray-800 text-white shadow-xl shadow-gray-200 transform scale-105`
-                      : 'bg-white border-white text-gray-500 hover:bg-white/80 shadow-sm'
-                  }`}
-                >
-                  <span className="text-2xl">{m.emoji}</span>
-                  <span className="text-[11px] font-bold">{m.label}</span>
-                </button>
+                <div key={m.value} className="relative group">
+                  <button
+                    type="button"
+                    onClick={() => setSelectedMood(m)}
+                    className={`px-4 py-3 rounded-2xl flex flex-col items-center justify-center gap-1 transition-all duration-300 border min-w-[70px] ${
+                      selectedMood.label === m.label
+                        ? `bg-gray-800 border-gray-800 text-white shadow-xl shadow-gray-200 transform scale-105`
+                        : 'bg-white border-white text-gray-500 hover:bg-white/80 shadow-sm'
+                    }`}
+                  >
+                    <span className="text-2xl">{m.emoji}</span>
+                    <span className="text-[11px] font-bold">{m.label}</span>
+                  </button>
+                  {/* 删除按钮 */}
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      deleteCustomMood(m.label);
+                    }}
+                    className="absolute -top-1 -right-1 w-5 h-5 bg-rose-500 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow-sm hover:bg-rose-600"
+                    title={`删除「${m.label}」`}
+                  >
+                    <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
               ))}
 
               {!isAddingMood ? (

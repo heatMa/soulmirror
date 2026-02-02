@@ -96,6 +96,7 @@ const App: React.FC = () => {
           content: formData.content,
           mood: formData.mood,
           moodScore: formData.moodScore,
+          moodEmoji: formData.moodEmoji,
           tags: formData.tags
         };
 
@@ -107,7 +108,7 @@ const App: React.FC = () => {
           .then(async (aiScore) => {
             if (aiScore > 0) {
               await databaseService.updateEntryMoodScore(updatedEntry.id, aiScore);
-              setEntries(currentEntries => 
+              setEntries(currentEntries =>
                 currentEntries.map(e => e.id === updatedEntry.id ? { ...e, moodScore: aiScore } : e)
               );
             }
@@ -118,8 +119,8 @@ const App: React.FC = () => {
         // 添加新条目
         const now = new Date();
         let timestamp = now.getTime();
-        
-        const isSameDay = (d1: Date, d2: Date) => 
+
+        const isSameDay = (d1: Date, d2: Date) =>
           d1.getDate() === d2.getDate() &&
           d1.getMonth() === d2.getMonth() &&
           d1.getFullYear() === d2.getFullYear();
@@ -135,6 +136,7 @@ const App: React.FC = () => {
           content: formData.content,
           mood: formData.mood,
           moodScore: formData.moodScore,
+          moodEmoji: formData.moodEmoji,
           tags: formData.tags
         };
 
@@ -146,7 +148,7 @@ const App: React.FC = () => {
           .then(async (aiScore) => {
             if (aiScore > 0) {
               await databaseService.updateEntryMoodScore(newEntry.id, aiScore);
-              setEntries(currentEntries => 
+              setEntries(currentEntries =>
                 currentEntries.map(e => e.id === newEntry.id ? { ...e, moodScore: aiScore } : e)
               );
             }
@@ -196,10 +198,21 @@ const App: React.FC = () => {
     }
   }, []);
 
-  const getMoodConfig = (moodLabel: string) => {
-    return MOOD_OPTIONS.find(m => m.label === moodLabel) || 
-           customMoods.find(m => m.label === moodLabel) || 
-           MOOD_OPTIONS[2];
+  const getMoodConfig = (moodLabel: string, entry?: DiaryEntry): MoodOption => {
+    const found = MOOD_OPTIONS.find(m => m.label === moodLabel) ||
+                  customMoods.find(m => m.label === moodLabel);
+    if (found) return found;
+
+    // 找不到配置时，使用 entry 自带的 emoji（如果有）
+    return {
+      label: moodLabel,
+      value: moodLabel,
+      score: entry?.moodScore || 5,
+      emoji: entry?.moodEmoji || '🏷️',
+      color: 'bg-gray-400',
+      shadow: 'shadow-gray-200',
+      suggestions: []
+    };
   };
 
   // 按时间降序排序用于时间线视图（最新的在最上面）
@@ -341,7 +354,7 @@ const App: React.FC = () => {
             ) : (
               <div className="glass-card rounded-[32px] p-6 animate-in slide-in-from-bottom-8 duration-500 min-h-[200px]">
                 {timelineEntries.map((entry, index) => {
-                  const moodConfig = getMoodConfig(entry.mood);
+                  const moodConfig = getMoodConfig(entry.mood, entry);
                   const isLast = index === timelineEntries.length - 1;
                   
                   return (
