@@ -538,10 +538,6 @@ const Dashboard: React.FC<Props> = ({ entries, onDataRestored }) => {
             <div className="flex items-center gap-2">
               {/* Backup/Restore Buttons */}
               <div className="flex items-center bg-white/60 backdrop-blur-sm p-1 rounded-xl border border-white/60 shadow-sm">
-                <div className="flex items-center px-2 text-gray-400 gap-1 border-r border-gray-200 mr-1">
-                   <ICONS.Backup />
-                   <span className="text-[10px] font-bold uppercase tracking-wider hidden sm:inline">数据</span>
-                </div>
                 <div className="flex gap-1">
                    <button
                      onClick={handleBackup}
@@ -549,7 +545,7 @@ const Dashboard: React.FC<Props> = ({ entries, onDataRestored }) => {
                      title="备份所有数据"
                    >
                      <ICONS.Download />
-                     <span className="hidden sm:inline">备份</span>
+                     <span>备份</span>
                    </button>
                    <button
                      onClick={handleRestoreClick}
@@ -557,7 +553,7 @@ const Dashboard: React.FC<Props> = ({ entries, onDataRestored }) => {
                      title="从备份文件恢复"
                    >
                      <ICONS.Upload />
-                     <span className="hidden sm:inline">恢复</span>
+                     <span>恢复</span>
                    </button>
                 </div>
               </div>
