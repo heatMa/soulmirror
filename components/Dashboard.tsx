@@ -62,12 +62,9 @@ const Dashboard: React.FC<Props> = ({ entries, onDataRestored }) => {
 
   // Load custom moods for color mapping
   useEffect(() => {
-    const saved = localStorage.getItem('soulmirror_custom_moods');
-    if (saved) {
-      try {
-        setCustomMoods(JSON.parse(saved));
-      } catch (e) { console.error("Failed to load custom moods"); }
-    }
+    databaseService.getCustomMoods()
+      .then(setCustomMoods)
+      .catch(e => console.error("Failed to load custom moods", e));
   }, []);
 
   const getMoodConfig = (moodLabel: string) => {

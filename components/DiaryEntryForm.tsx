@@ -3,6 +3,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { DiaryEntry } from '../types';
 import { MOOD_OPTIONS, MoodOption, ICONS } from '../constants';
 import { generateMoodMetadata } from '../services/geminiService';
+import { databaseService } from '../services/databaseService';
 
 interface Props {
   initialData?: DiaryEntry | null;
@@ -57,35 +58,39 @@ const DiaryEntryForm: React.FC<Props> = ({ initialData, onSave, onClose }) => {
   }, [initialData, customMoods]);
 
   useEffect(() => {
-    const saved = localStorage.getItem('soulmirror_custom_moods');
-    if (saved) {
-      try {
-        setCustomMoods(JSON.parse(saved));
-      } catch (e) {
-        console.error("Failed to load custom moods");
-      }
-    }
+    // 从数据库加载自定义心情
+    databaseService.getCustomMoods()
+      .then(setCustomMoods)
+      .catch(e => console.error("Failed to load custom moods", e));
   }, []);
 
-  const saveCustomMood = (newMood: MoodOption) => {
+  const saveCustomMood = async (newMood: MoodOption) => {
     if (customMoods.some(m => m.label === newMood.label) || MOOD_OPTIONS.some(m => m.label === newMood.label)) {
       return;
     }
-    const updated = [...customMoods, newMood];
-    setCustomMoods(updated);
-    localStorage.setItem('soulmirror_custom_moods', JSON.stringify(updated));
+    try {
+      await databaseService.saveCustomMood(newMood);
+      const updated = [...customMoods, newMood];
+      setCustomMoods(updated);
+    } catch (e) {
+      console.error("Failed to save custom mood", e);
+    }
   };
 
-  const deleteCustomMood = (label: string) => {
+  const deleteCustomMood = async (label: string) => {
     if (!confirm(`确定要删除心情「${label}」吗？\n\n删除后，使用该心情的历史记录不受影响。`)) {
       return;
     }
-    const updated = customMoods.filter(m => m.label !== label);
-    setCustomMoods(updated);
-    localStorage.setItem('soulmirror_custom_moods', JSON.stringify(updated));
-    // 如果当前选中的是被删除的心情，切换到默认心情
-    if (selectedMood.label === label) {
-      setSelectedMood(MOOD_OPTIONS[0]);
+    try {
+      await databaseService.deleteCustomMood(label);
+      const updated = customMoods.filter(m => m.label !== label);
+      setCustomMoods(updated);
+      // 如果当前选中的是被删除的心情，切换到默认心情
+      if (selectedMood.label === label) {
+        setSelectedMood(MOOD_OPTIONS[0]);
+      }
+    } catch (e) {
+      console.error("Failed to delete custom mood", e);
     }
   };
 

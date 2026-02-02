@@ -21,6 +21,7 @@ CREATE TABLE IF NOT EXISTS diary_entries (
   timestamp INTEGER NOT NULL,
   mood TEXT NOT NULL,
   mood_score REAL DEFAULT 0,
+  mood_emoji TEXT,
   content TEXT NOT NULL,
   tags TEXT DEFAULT '[]'
 );
@@ -84,7 +85,10 @@ class DatabaseService {
 
         await this.db.open();
         await this.db.execute(CREATE_TABLES_SQL);
-        
+
+        // 数据库迁移：为已有表添加 mood_emoji 列
+        await this.migrateDatabase();
+
         console.log('SQLite 数据库初始化完成');
       } else {
         // Web 平台：使用 localStorage
@@ -95,6 +99,27 @@ class DatabaseService {
     } catch (error) {
       console.error('数据库初始化失败:', error);
       throw error;
+    }
+  }
+
+  /**
+   * 数据库迁移
+   */
+  private async migrateDatabase(): Promise<void> {
+    if (!this.isNative || !this.db) return;
+
+    try {
+      // 检查 mood_emoji 列是否存在，不存在则添加
+      const tableInfo = await this.db.query("PRAGMA table_info(diary_entries)");
+      const columns = tableInfo.values || [];
+      const hasMoodEmoji = columns.some((col: any) => col.name === 'mood_emoji');
+
+      if (!hasMoodEmoji) {
+        await this.db.execute('ALTER TABLE diary_entries ADD COLUMN mood_emoji TEXT');
+        console.log('数据库迁移：添加 mood_emoji 列');
+      }
+    } catch (error) {
+      console.error('数据库迁移失败:', error);
     }
   }
 
@@ -140,9 +165,9 @@ class DatabaseService {
 
     if (this.isNative && this.db) {
       await this.db.run(
-        `INSERT INTO diary_entries (id, timestamp, mood, mood_score, content, tags) 
-         VALUES (?, ?, ?, ?, ?, ?)`,
-        [id, entry.timestamp, entry.mood, entry.moodScore, entry.content, JSON.stringify(entry.tags)]
+        `INSERT INTO diary_entries (id, timestamp, mood, mood_score, mood_emoji, content, tags)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        [id, entry.timestamp, entry.mood, entry.moodScore, entry.moodEmoji || null, entry.content, JSON.stringify(entry.tags)]
       );
     } else {
       const entries = await this.getAllEntries();
@@ -161,10 +186,10 @@ class DatabaseService {
 
     if (this.isNative && this.db) {
       await this.db.run(
-        `UPDATE diary_entries 
-         SET timestamp = ?, mood = ?, mood_score = ?, content = ?, tags = ? 
+        `UPDATE diary_entries
+         SET timestamp = ?, mood = ?, mood_score = ?, mood_emoji = ?, content = ?, tags = ?
          WHERE id = ?`,
-        [entry.timestamp, entry.mood, entry.moodScore, entry.content, JSON.stringify(entry.tags), entry.id]
+        [entry.timestamp, entry.mood, entry.moodScore, entry.moodEmoji || null, entry.content, JSON.stringify(entry.tags), entry.id]
       );
     } else {
       const entries = await this.getAllEntries();
@@ -218,6 +243,7 @@ class DatabaseService {
       timestamp: row.timestamp as number,
       mood: row.mood as string,
       moodScore: row.mood_score as number,
+      moodEmoji: row.mood_emoji as string | undefined,
       content: row.content as string,
       tags: JSON.parse((row.tags as string) || '[]')
     };
@@ -422,9 +448,9 @@ class DatabaseService {
             if (this.isNative && this.db) {
               // SQLite: 使用 INSERT OR REPLACE
               await this.db.run(
-                `INSERT OR REPLACE INTO diary_entries (id, timestamp, mood, mood_score, content, tags)
-                 VALUES (?, ?, ?, ?, ?, ?)`,
-                [entry.id, entry.timestamp, entry.mood, entry.moodScore, entry.content, JSON.stringify(entry.tags)]
+                `INSERT OR REPLACE INTO diary_entries (id, timestamp, mood, mood_score, mood_emoji, content, tags)
+                 VALUES (?, ?, ?, ?, ?, ?, ?)`,
+                [entry.id, entry.timestamp, entry.mood, entry.moodScore, entry.moodEmoji || null, entry.content, JSON.stringify(entry.tags)]
               );
             } else {
               // localStorage: 合并条目
