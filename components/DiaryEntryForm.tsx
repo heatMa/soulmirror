@@ -175,21 +175,21 @@ const DiaryEntryForm: React.FC<Props> = ({ initialData, onSave, onClose }) => {
 
         <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto px-6 pb-6 space-y-8">
           
-          <div className="space-y-4">
-            <div className="flex flex-wrap gap-3">
+          <div className="space-y-3">
+            <div className="flex flex-wrap gap-2">
               {MOOD_OPTIONS.map((m) => (
                 <button
                   key={m.value}
                   type="button"
                   onClick={() => setSelectedMood(m)}
-                  className={`px-4 py-3 rounded-2xl flex flex-col items-center justify-center gap-1 transition-all duration-300 border min-w-[70px] ${
+                  className={`px-2.5 py-1.5 rounded-xl flex items-center gap-1.5 transition-all duration-300 border ${
                     selectedMood.label === m.label
-                      ? `bg-gray-800 border-gray-800 text-white shadow-xl shadow-gray-200 transform scale-105`
+                      ? `bg-gray-800 border-gray-800 text-white shadow-lg shadow-gray-200 transform scale-105`
                       : 'bg-white border-white text-gray-500 hover:bg-white/80 shadow-sm'
                   }`}
                 >
-                  <span className="text-2xl filter drop-shadow-sm">{m.emoji}</span>
-                  <span className="text-[11px] font-bold">{m.label}</span>
+                  <span className="text-base">{m.emoji}</span>
+                  <span className="text-xs font-bold">{m.label}</span>
                 </button>
               ))}
 
@@ -198,14 +198,14 @@ const DiaryEntryForm: React.FC<Props> = ({ initialData, onSave, onClose }) => {
                   <button
                     type="button"
                     onClick={() => setSelectedMood(m)}
-                    className={`px-4 py-3 rounded-2xl flex flex-col items-center justify-center gap-1 transition-all duration-300 border min-w-[70px] ${
+                    className={`px-2.5 py-1.5 rounded-xl flex items-center gap-1.5 transition-all duration-300 border ${
                       selectedMood.label === m.label
-                        ? `bg-gray-800 border-gray-800 text-white shadow-xl shadow-gray-200 transform scale-105`
+                        ? `bg-gray-800 border-gray-800 text-white shadow-lg shadow-gray-200 transform scale-105`
                         : 'bg-white border-white text-gray-500 hover:bg-white/80 shadow-sm'
                     }`}
                   >
-                    <span className="text-2xl">{m.emoji}</span>
-                    <span className="text-[11px] font-bold">{m.label}</span>
+                    <span className="text-base">{m.emoji}</span>
+                    <span className="text-xs font-bold">{m.label}</span>
                   </button>
                   {/* 删除按钮 */}
                   <button
@@ -214,10 +214,10 @@ const DiaryEntryForm: React.FC<Props> = ({ initialData, onSave, onClose }) => {
                       e.stopPropagation();
                       deleteCustomMood(m.label);
                     }}
-                    className="absolute -top-1 -right-1 w-5 h-5 bg-rose-500 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow-sm hover:bg-rose-600"
+                    className="absolute -top-1 -right-1 w-4 h-4 bg-rose-500 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow-sm hover:bg-rose-600"
                     title={`删除「${m.label}」`}
                   >
-                    <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <svg className="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                     </svg>
                   </button>
@@ -228,10 +228,10 @@ const DiaryEntryForm: React.FC<Props> = ({ initialData, onSave, onClose }) => {
                 <button
                   type="button"
                   onClick={() => setIsAddingMood(true)}
-                  className="px-4 py-3 rounded-2xl flex flex-col items-center justify-center gap-1 transition-all border border-dashed border-gray-300 text-gray-400 hover:border-gray-400 hover:text-gray-500 min-w-[70px]"
+                  className="px-2.5 py-1.5 rounded-xl flex items-center gap-1.5 transition-all border border-dashed border-gray-300 text-gray-400 hover:border-gray-400 hover:text-gray-500"
                 >
-                  <span className="text-2xl">+</span>
-                  <span className="text-[11px] font-medium">自定义</span>
+                  <span className="text-base">+</span>
+                  <span className="text-xs font-medium">自定义</span>
                 </button>
               ) : (
                 <div className="flex flex-col gap-2 w-full animate-in fade-in bg-white p-3 rounded-2xl shadow-sm border border-indigo-100">
@@ -245,9 +245,9 @@ const DiaryEntryForm: React.FC<Props> = ({ initialData, onSave, onClose }) => {
                     disabled={isGeneratingTag}
                     className="w-full px-3 py-2 bg-gray-50 border-none rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-100"
                   />
-                  <button 
-                    type="button" 
-                    onClick={handleAddNewMood} 
+                  <button
+                    type="button"
+                    onClick={handleAddNewMood}
                     disabled={isGeneratingTag}
                     className="w-full py-2 bg-gray-900 text-white rounded-xl text-xs font-bold disabled:opacity-50"
                   >
@@ -323,7 +323,7 @@ const DiaryEntryForm: React.FC<Props> = ({ initialData, onSave, onClose }) => {
             <div
               ref={contentRef}
               contentEditable
-              className="w-full h-64 p-6 bg-white rounded-3xl shadow-[inset_0_2px_10px_rgba(0,0,0,0.03)] focus:shadow-[inset_0_2px_15px_rgba(0,0,0,0.05)] transition-all text-gray-700 text-lg leading-relaxed outline-none overflow-y-auto empty:before:content-[attr(data-placeholder)] empty:before:text-gray-300"
+              className="w-full h-64 p-5 bg-white rounded-3xl shadow-[inset_0_2px_10px_rgba(0,0,0,0.03)] focus:shadow-[inset_0_2px_15px_rgba(0,0,0,0.05)] transition-all text-gray-700 text-[15px] leading-7 outline-none overflow-y-auto empty:before:content-[attr(data-placeholder)] empty:before:text-gray-300"
               data-placeholder="在这里写下你的思绪，无论是开心还是难过，我都会倾听..."
               style={{ whiteSpace: 'pre-wrap' }}
             />

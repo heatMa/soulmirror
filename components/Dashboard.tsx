@@ -223,9 +223,13 @@ const Dashboard: React.FC<Props> = ({ entries, onDataRestored }) => {
       const link = document.createElement('a');
       link.href = url;
       const date = new Date().toISOString().split('T')[0];
-      link.download = `soulmirror_backup_${date}.json`;
+      const filename = `soulmirror_backup_${date}.json`;
+      link.download = filename;
       link.click();
       URL.revokeObjectURL(url);
+
+      // 提示用户备份完成
+      alert(`备份完成！\n\n文件名: ${filename}\n保存位置: 下载文件夹 (Downloads)\n\n请妥善保管此文件，恢复数据时需要使用。`);
     } catch (err) {
       alert('备份失败，请重试');
       console.error('备份失败:', err);
