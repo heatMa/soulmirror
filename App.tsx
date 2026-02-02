@@ -161,14 +161,13 @@ const App: React.FC = () => {
   }, [selectedDate]);
 
   // 删除日记条目
-  const deleteEntry = useCallback(async (id: string) => {
-    if (confirm("确定要删除这条记录吗？")) {
-      try {
-        await databaseService.deleteEntry(id);
-        setEntries(prev => prev.filter(e => e.id !== id));
-      } catch (error) {
-        console.error('删除日记条目失败:', error);
-      }
+  const deleteEntry = useCallback(async (entry: DiaryEntry) => {
+    try {
+      await databaseService.deleteEntry(entry.id);
+      setEntries(prev => prev.filter(e => e.id !== entry.id));
+    } catch (error) {
+      console.error('删除日记条目失败:', error);
+      alert('删除失败，请重试');
     }
   }, []);
 
@@ -358,12 +357,13 @@ const App: React.FC = () => {
                   const isLast = index === timelineEntries.length - 1;
                   
                   return (
-                    <TimelineItem 
+                    <TimelineItem
                         key={entry.id}
                         entry={entry}
                         moodConfig={moodConfig}
                         isLast={isLast}
                         onEdit={openEditModal}
+                        onDelete={deleteEntry}
                     />
                   );
                 })}
