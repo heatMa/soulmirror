@@ -104,18 +104,35 @@ const Dashboard: React.FC<Props> = ({ entries, onDataRestored }) => {
     }).sort((a, b) => a.timestamp - b.timestamp);
   }, [entries, timeRange]);
 
-  const chartData = filteredEntries.map(e => ({
-    time: new Date(e.timestamp).toLocaleTimeString([], { 
-      hour: '2-digit', 
-      minute: '2-digit',
-    }),
-    shortTime: (timeRange === 'today' || timeRange === 'yesterday')
-      ? new Date(e.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-      : new Date(e.timestamp).toLocaleDateString([], { month: 'numeric', day: 'numeric' }),
-    score: e.moodScore,
-    mood: e.mood,
-    content: e.content
-  }));
+  // 图表数据：今天/昨天使用小时作为横轴，本周/本月使用日期
+  const chartData = useMemo(() => {
+    if (timeRange === 'today' || timeRange === 'yesterday') {
+      // 使用数值型小时作为横轴
+      return filteredEntries.map(e => {
+        const date = new Date(e.timestamp);
+        const hour = date.getHours() + date.getMinutes() / 60;
+        return {
+          hour,
+          time: date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          score: e.moodScore,
+          mood: e.mood,
+          content: e.content
+        };
+      });
+    } else {
+      // 本周/本月使用日期字符串
+      return filteredEntries.map(e => ({
+        time: new Date(e.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        shortTime: new Date(e.timestamp).toLocaleDateString([], { month: 'numeric', day: 'numeric' }),
+        score: e.moodScore,
+        mood: e.mood,
+        content: e.content
+      }));
+    }
+  }, [filteredEntries, timeRange]);
+
+  // 判断是否使用固定 0-24 横轴
+  const useFixedHourAxis = timeRange === 'today' || timeRange === 'yesterday';
 
   // --- Statistics Logic ---
   const tagStats = useMemo(() => {
@@ -326,7 +343,7 @@ const Dashboard: React.FC<Props> = ({ entries, onDataRestored }) => {
         </h3>
         
         {filteredEntries.length > 0 ? (
-          <div className="h-64 w-full -ml-2"> 
+          <div className="h-64 w-full -ml-2">
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                 <defs>
@@ -336,33 +353,46 @@ const Dashboard: React.FC<Props> = ({ entries, onDataRestored }) => {
                   </linearGradient>
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(0,0,0,0.05)" />
-                <XAxis 
-                  dataKey="shortTime" 
-                  axisLine={false} 
-                  tickLine={false} 
-                  tick={{fontSize: 10, fill: '#9ca3af'}} 
-                  interval="preserveStartEnd"
-                  padding={{ left: 20, right: 20 }}
-                />
-                <YAxis 
-                  domain={[0, 10]} 
-                  axisLine={false} 
-                  tickLine={false} 
-                  tick={{fontSize: 10, fill: '#9ca3af', fontWeight: 500}} 
+                {useFixedHourAxis ? (
+                  <XAxis
+                    dataKey="hour"
+                    type="number"
+                    domain={[0, 24]}
+                    axisLine={false}
+                    tickLine={false}
+                    tick={{fontSize: 10, fill: '#9ca3af'}}
+                    ticks={[0, 6, 12, 18, 24]}
+                    tickFormatter={(value) => `${value}:00`}
+                  />
+                ) : (
+                  <XAxis
+                    dataKey="shortTime"
+                    axisLine={false}
+                    tickLine={false}
+                    tick={{fontSize: 10, fill: '#9ca3af'}}
+                    interval="preserveStartEnd"
+                    padding={{ left: 20, right: 20 }}
+                  />
+                )}
+                <YAxis
+                  domain={[0, 10]}
+                  axisLine={false}
+                  tickLine={false}
+                  tick={{fontSize: 10, fill: '#9ca3af', fontWeight: 500}}
                   ticks={[0, 5, 10]}
                   width={30}
                 />
-                <Tooltip 
+                <Tooltip
                   content={<CustomTooltip />}
                   cursor={{ stroke: '#4f46e5', strokeWidth: 1, strokeDasharray: '4 4' }}
                 />
-                <Area 
-                  type="monotone" 
-                  dataKey="score" 
-                  stroke="#4f46e5" 
-                  strokeWidth={3} 
-                  fillOpacity={1} 
-                  fill="url(#colorScore)" 
+                <Area
+                  type="monotone"
+                  dataKey="score"
+                  stroke="#4f46e5"
+                  strokeWidth={3}
+                  fillOpacity={1}
+                  fill="url(#colorScore)"
                   animationDuration={1500}
                 />
               </AreaChart>
