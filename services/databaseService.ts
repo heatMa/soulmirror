@@ -24,7 +24,8 @@ CREATE TABLE IF NOT EXISTS diary_entries (
   mood_emoji TEXT,
   content TEXT NOT NULL,
   tags TEXT DEFAULT '[]',
-  ai_reply TEXT
+  ai_reply TEXT,
+  ai_suggestions TEXT
 );
 
 CREATE TABLE IF NOT EXISTS daily_notes (
@@ -115,6 +116,7 @@ class DatabaseService {
       const columns = tableInfo.values || [];
       const hasMoodEmoji = columns.some((col: any) => col.name === 'mood_emoji');
       const hasAiReply = columns.some((col: any) => col.name === 'ai_reply');
+      const hasAiSuggestions = columns.some((col: any) => col.name === 'ai_suggestions');
 
       if (!hasMoodEmoji) {
         await this.db.execute('ALTER TABLE diary_entries ADD COLUMN mood_emoji TEXT');
@@ -124,6 +126,11 @@ class DatabaseService {
       if (!hasAiReply) {
         await this.db.execute('ALTER TABLE diary_entries ADD COLUMN ai_reply TEXT');
         console.log('数据库迁移：添加 ai_reply 列');
+      }
+
+      if (!hasAiSuggestions) {
+        await this.db.execute('ALTER TABLE diary_entries ADD COLUMN ai_suggestions TEXT');
+        console.log('数据库迁移：添加 ai_suggestions 列');
       }
     } catch (error) {
       console.error('数据库迁移失败:', error);
@@ -245,6 +252,24 @@ class DatabaseService {
   }
 
   /**
+   * 更新日记条目的 AI 情绪调节建议
+   */
+  async updateEntryAiSuggestions(id: string, aiSuggestions: string[]): Promise<void> {
+    await this.ensureInitialized();
+
+    if (this.isNative && this.db) {
+      await this.db.run('UPDATE diary_entries SET ai_suggestions = ? WHERE id = ?', [JSON.stringify(aiSuggestions), id]);
+    } else {
+      const entries = await this.getAllEntries();
+      const index = entries.findIndex(e => e.id === id);
+      if (index !== -1) {
+        entries[index].aiSuggestions = aiSuggestions;
+        localStorage.setItem(STORAGE_KEYS.ENTRIES, JSON.stringify(entries));
+      }
+    }
+  }
+
+  /**
    * 删除日记条目
    */
   async deleteEntry(id: string): Promise<void> {
@@ -271,7 +296,8 @@ class DatabaseService {
       moodEmoji: row.mood_emoji as string | undefined,
       content: row.content as string,
       tags: JSON.parse((row.tags as string) || '[]'),
-      aiReply: row.ai_reply as string | undefined
+      aiReply: row.ai_reply as string | undefined,
+      aiSuggestions: row.ai_suggestions ? JSON.parse(row.ai_suggestions as string) : undefined
     };
   }
 

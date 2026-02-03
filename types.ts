@@ -8,6 +8,7 @@ export interface DiaryEntry {
   content: string;
   tags: string[];
   aiReply?: string; // AI 暖心回复
+  aiSuggestions?: string[]; // AI 情绪调节建议（负面情绪时生成）
 }
 
 export interface AIAnalysis {

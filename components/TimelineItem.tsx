@@ -211,6 +211,18 @@ const TimelineItem: React.FC<Props> = ({ entry, moodConfig, isLast, onEdit, onDe
                </p>
              </div>
            )}
+
+           {/* AI 情绪调节建议（仅负面情绪时显示） */}
+           {entry.aiSuggestions && entry.aiSuggestions.length > 0 && (
+             <div className="mt-3 bg-amber-50 rounded-xl p-3">
+               <div className="text-xs font-bold text-amber-600 mb-2">💡 试试这样做：</div>
+               <ul className="space-y-1">
+                 {entry.aiSuggestions.map((suggestion, index) => (
+                   <li key={index} className="text-sm text-amber-700">• {suggestion}</li>
+                 ))}
+               </ul>
+             </div>
+           )}
         </div>
       </div>
     </div>

@@ -214,6 +214,56 @@ export const analyzeMoods = async (entries: DiaryEntry[]): Promise<AIAnalysis> =
   }
 };
 
+// 生成 AI 情绪调节建议（仅在负面情绪时调用）
+export const generateRegulationSuggestions = async (
+  mood: string,
+  content: string,
+  moodScore: number
+): Promise<string[]> => {
+  const promptText = `
+    用户刚刚写了一篇负面情绪的心情日记：
+
+    心情标签: ${mood}
+    情绪评分: ${moodScore}分（满分10分）
+    日记内容: ${content}
+
+    请根据用户的具体情绪和内容，给出2-3条简短、具体、可立即执行的情绪调节建议。
+
+    要求：
+    1. 每条建议10-20个字，简洁有力
+    2. 建议要针对性强，根据具体情绪类型给出不同建议：
+       - 焦虑/压力大 → 放松技巧（深呼吸、肌肉放松等）
+       - 难过/低落 → 自我关怀（休息、与人倾诉等）
+       - 愤怒/烦躁 → 冷静技巧（暂时离开、运动等）
+       - 疲惫/无力 → 恢复能量（小憩、补充能量等）
+    3. 包含一条即时可做的事（如深呼吸、喝杯水）
+    4. 包含一条稍后安排的事（如早睡、散步、倾诉）
+    5. 语气温和鼓励，不要说教
+
+    返回 JSON 格式: { "suggestions": ["建议1", "建议2", "建议3"] }
+  `;
+
+  try {
+    let jsonString = "{}";
+
+    if (CURRENT_PROVIDER === 'DEEPSEEK') {
+      console.log("Using DeepSeek for Regulation Suggestions...");
+      jsonString = await callDeepSeek(
+        "你是一位温柔的心理咨询师，擅长给出简短实用的情绪调节建议。请只返回 JSON。",
+        promptText
+      );
+    } else {
+      throw new Error("Gemini provider not configured. Please use DEEPSEEK.");
+    }
+
+    const result = JSON.parse(cleanJsonString(jsonString));
+    return result.suggestions || [];
+  } catch (error) {
+    console.error(`Regulation suggestions generation failed (${CURRENT_PROVIDER}):`, error);
+    return []; // 失败时返回空数组，不显示建议
+  }
+};
+
 // 生成 AI 暖心回复
 export const generateAiReply = async (mood: string, content: string): Promise<string> => {
   const promptText = `

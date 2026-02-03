@@ -8,7 +8,7 @@ import DailyMoodChart from './components/DailyMoodChart';
 import DailyNoteEditor from './components/DailyNoteEditor';
 import TimelineItem from './components/TimelineItem';
 import { ICONS, MOOD_OPTIONS, MoodOption } from './constants';
-import { evaluateMoodScore, generateAiReply } from './services/geminiService';
+import { evaluateMoodScore, generateAiReply, generateRegulationSuggestions } from './services/geminiService';
 import { databaseService } from './services/databaseService';
 
 const App: React.FC = () => {
@@ -111,6 +111,26 @@ const App: React.FC = () => {
               setEntries(currentEntries =>
                 currentEntries.map(e => e.id === updatedEntry.id ? { ...e, moodScore: aiScore } : e)
               );
+
+              // 负面情绪时生成调节建议（评分 ≤ 5）
+              if (aiScore <= 5) {
+                generateRegulationSuggestions(updatedEntry.mood, updatedEntry.content, aiScore)
+                  .then(async (suggestions) => {
+                    if (suggestions && suggestions.length > 0) {
+                      await databaseService.updateEntryAiSuggestions(updatedEntry.id, suggestions);
+                      setEntries(currentEntries =>
+                        currentEntries.map(e => e.id === updatedEntry.id ? { ...e, aiSuggestions: suggestions } : e)
+                      );
+                    }
+                  })
+                  .catch(console.error);
+              } else {
+                // 如果情绪变好了（评分 > 5），清除之前的调节建议
+                await databaseService.updateEntryAiSuggestions(updatedEntry.id, []);
+                setEntries(currentEntries =>
+                  currentEntries.map(e => e.id === updatedEntry.id ? { ...e, aiSuggestions: undefined } : e)
+                );
+              }
             }
           })
           .catch(console.error);
@@ -151,6 +171,20 @@ const App: React.FC = () => {
               setEntries(currentEntries =>
                 currentEntries.map(e => e.id === newEntry.id ? { ...e, moodScore: aiScore } : e)
               );
+
+              // 负面情绪时生成调节建议（评分 ≤ 5）
+              if (aiScore <= 5) {
+                generateRegulationSuggestions(newEntry.mood, newEntry.content, aiScore)
+                  .then(async (suggestions) => {
+                    if (suggestions && suggestions.length > 0) {
+                      await databaseService.updateEntryAiSuggestions(newEntry.id, suggestions);
+                      setEntries(currentEntries =>
+                        currentEntries.map(e => e.id === newEntry.id ? { ...e, aiSuggestions: suggestions } : e)
+                      );
+                    }
+                  })
+                  .catch(console.error);
+              }
             }
           })
           .catch(console.error);
