@@ -12,16 +12,13 @@ export interface MoodOption {
 }
 
 export const MOOD_OPTIONS: MoodOption[] = [
-  { label: '开心', value: 'happy', score: 9, emoji: '😊', color: 'bg-emerald-500', shadow: 'shadow-emerald-200', suggestions: ['顺利', '美食', '聚会'] },
-  { label: '心流', value: 'flow', score: 10, emoji: '🚀', color: 'bg-teal-500', shadow: 'shadow-teal-200', suggestions: ['专注', '高效', '沉浸'] },
-  { label: '平淡', value: 'plain', score: 6, emoji: '😐', color: 'bg-slate-400', shadow: 'shadow-slate-200', suggestions: ['日常', '普通', '平静'] },
-  { label: '不知道干啥', value: 'lost', score: 5, emoji: '🤷', color: 'bg-gray-400', shadow: 'shadow-gray-200', suggestions: ['迷茫', '无聊', '空虚'] },
-  { label: '生气', value: 'angry', score: 3, emoji: '😡', color: 'bg-rose-600', shadow: 'shadow-rose-200', suggestions: ['不公', '争吵', '被误解'] },
-  { label: '焦虑', value: 'anxious', score: 4, emoji: '😰', color: 'bg-amber-500', shadow: 'shadow-amber-200', suggestions: ['压力', '催促', '未知'] },
-  { label: '无精力', value: 'tired', score: 3, emoji: '😴', color: 'bg-indigo-400', shadow: 'shadow-indigo-200', suggestions: ['疲惫', '困倦', '乏力'] },
-  { label: '心慌', value: 'panic', score: 2, emoji: '💓', color: 'bg-pink-500', shadow: 'shadow-pink-200', suggestions: ['紧张', '不安', '忐忑'] },
-  { label: '内耗', value: 'drain', score: 2, emoji: '🌀', color: 'bg-violet-500', shadow: 'shadow-violet-200', suggestions: ['纠结', '自我怀疑', '消耗'] },
-  { label: '沉溺', value: 'indulge', score: 1, emoji: '🕳️', color: 'bg-fuchsia-700', shadow: 'shadow-fuchsia-300', suggestions: ['逃避', '上瘾', '沉迷'] },
+  { label: '开心', value: 'happy', score: 9, emoji: '😊', color: 'bg-emerald-500', shadow: 'shadow-emerald-200', suggestions: ['顺利', '收获', '惊喜'] },
+  { label: '平静', value: 'calm', score: 7, emoji: '😌', color: 'bg-sky-400', shadow: 'shadow-sky-200', suggestions: ['放松', '舒适', '安心'] },
+  { label: '一般', value: 'normal', score: 5, emoji: '😐', color: 'bg-slate-400', shadow: 'shadow-slate-200', suggestions: ['普通', '日常', '平淡'] },
+  { label: '疲惫', value: 'tired', score: 4, emoji: '😩', color: 'bg-indigo-400', shadow: 'shadow-indigo-200', suggestions: ['累了', '困倦', '需要休息'] },
+  { label: '焦虑', value: 'anxious', score: 3, emoji: '😰', color: 'bg-amber-500', shadow: 'shadow-amber-200', suggestions: ['压力', '担心', '紧张'] },
+  { label: '难过', value: 'sad', score: 3, emoji: '😢', color: 'bg-blue-500', shadow: 'shadow-blue-200', suggestions: ['失落', '委屈', '伤心'] },
+  { label: '生气', value: 'angry', score: 2, emoji: '😠', color: 'bg-rose-500', shadow: 'shadow-rose-200', suggestions: ['不满', '烦躁', '愤怒'] },
 ];
 
 export const ICONS = {
