@@ -7,6 +7,7 @@ export interface DiaryEntry {
   moodEmoji?: string; // 心情表情，用于删除心情配置后仍能正确显示
   content: string;
   tags: string[];
+  aiReply?: string; // AI 暖心回复
 }
 
 export interface AIAnalysis {

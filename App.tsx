@@ -8,7 +8,7 @@ import DailyMoodChart from './components/DailyMoodChart';
 import DailyNoteEditor from './components/DailyNoteEditor';
 import TimelineItem from './components/TimelineItem';
 import { ICONS, MOOD_OPTIONS, MoodOption } from './constants';
-import { evaluateMoodScore } from './services/geminiService';
+import { evaluateMoodScore, generateAiReply } from './services/geminiService';
 import { databaseService } from './services/databaseService';
 
 const App: React.FC = () => {
@@ -150,6 +150,18 @@ const App: React.FC = () => {
               await databaseService.updateEntryMoodScore(newEntry.id, aiScore);
               setEntries(currentEntries =>
                 currentEntries.map(e => e.id === newEntry.id ? { ...e, moodScore: aiScore } : e)
+              );
+            }
+          })
+          .catch(console.error);
+
+        // AI 暖心回复
+        generateAiReply(newEntry.mood, newEntry.content)
+          .then(async (reply) => {
+            if (reply) {
+              await databaseService.updateEntryAiReply(newEntry.id, reply);
+              setEntries(currentEntries =>
+                currentEntries.map(e => e.id === newEntry.id ? { ...e, aiReply: reply } : e)
               );
             }
           })

@@ -201,6 +201,16 @@ const TimelineItem: React.FC<Props> = ({ entry, moodConfig, isLast, onEdit, onDe
                  <div className="text-xs text-emerald-500 font-bold mt-1">展开全文</div>
               )}
            </div>
+
+           {/* AI 暖心回复 */}
+           {entry.aiReply && (
+             <div className="mt-3 pl-3 border-l-2 border-emerald-200">
+               <p className="text-sm text-emerald-600 italic">
+                 <span className="not-italic mr-1">🤖</span>
+                 {entry.aiReply}
+               </p>
+             </div>
+           )}
         </div>
       </div>
     </div>

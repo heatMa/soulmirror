@@ -23,7 +23,8 @@ CREATE TABLE IF NOT EXISTS diary_entries (
   mood_score REAL DEFAULT 0,
   mood_emoji TEXT,
   content TEXT NOT NULL,
-  tags TEXT DEFAULT '[]'
+  tags TEXT DEFAULT '[]',
+  ai_reply TEXT
 );
 
 CREATE TABLE IF NOT EXISTS daily_notes (
@@ -113,10 +114,16 @@ class DatabaseService {
       const tableInfo = await this.db.query("PRAGMA table_info(diary_entries)");
       const columns = tableInfo.values || [];
       const hasMoodEmoji = columns.some((col: any) => col.name === 'mood_emoji');
+      const hasAiReply = columns.some((col: any) => col.name === 'ai_reply');
 
       if (!hasMoodEmoji) {
         await this.db.execute('ALTER TABLE diary_entries ADD COLUMN mood_emoji TEXT');
         console.log('数据库迁移：添加 mood_emoji 列');
+      }
+
+      if (!hasAiReply) {
+        await this.db.execute('ALTER TABLE diary_entries ADD COLUMN ai_reply TEXT');
+        console.log('数据库迁移：添加 ai_reply 列');
       }
     } catch (error) {
       console.error('数据库迁移失败:', error);
@@ -220,6 +227,24 @@ class DatabaseService {
   }
 
   /**
+   * 更新日记条目的 AI 回复
+   */
+  async updateEntryAiReply(id: string, aiReply: string): Promise<void> {
+    await this.ensureInitialized();
+
+    if (this.isNative && this.db) {
+      await this.db.run('UPDATE diary_entries SET ai_reply = ? WHERE id = ?', [aiReply, id]);
+    } else {
+      const entries = await this.getAllEntries();
+      const index = entries.findIndex(e => e.id === id);
+      if (index !== -1) {
+        entries[index].aiReply = aiReply;
+        localStorage.setItem(STORAGE_KEYS.ENTRIES, JSON.stringify(entries));
+      }
+    }
+  }
+
+  /**
    * 删除日记条目
    */
   async deleteEntry(id: string): Promise<void> {
@@ -245,7 +270,8 @@ class DatabaseService {
       moodScore: row.mood_score as number,
       moodEmoji: row.mood_emoji as string | undefined,
       content: row.content as string,
-      tags: JSON.parse((row.tags as string) || '[]')
+      tags: JSON.parse((row.tags as string) || '[]'),
+      aiReply: row.ai_reply as string | undefined
     };
   }
 

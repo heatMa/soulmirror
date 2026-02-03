@@ -171,11 +171,11 @@ export const analyzeMoods = async (entries: DiaryEntry[]): Promise<AIAnalysis> =
   const promptText = `
     以下是用户最近的一系列心情日记记录：
     ${JSON.stringify(entriesSummary, null, 2)}
-    
+
     请分析用户的心情"晴雨表"。
     识别出用户心情较好的时间段和突发的情绪低谷。
     给出最真诚、有用的建议。
-    
+
     【重点】：请用一个最有神韵的汉字或一个简短的词（不超过3个字）来形容这段时间的状态（例如：静、破茧、小确幸、乱、沉淀），放入 keyword 字段。
 
     必须返回符合以下结构的严格 JSON:
@@ -211,5 +211,47 @@ export const analyzeMoods = async (entries: DiaryEntry[]): Promise<AIAnalysis> =
   } catch (error) {
     console.error(`Failed to analyze moods (${CURRENT_PROVIDER})`, error);
     throw new Error("AI 分析失败");
+  }
+};
+
+// 生成 AI 暖心回复
+export const generateAiReply = async (mood: string, content: string): Promise<string> => {
+  const promptText = `
+    用户刚刚写了一篇心情日记：
+
+    心情标签: ${mood}
+    日记内容: ${content}
+
+    请用一句温暖、真诚的话回应用户。要求：
+    1. 简短有力，不超过30个字
+    2. 表达共情和理解，不要说教
+    3. 根据情绪调整语气：
+       - 开心时：一起分享喜悦
+       - 难过时：温柔陪伴，给予力量
+       - 平静时：肯定当下的状态
+    4. 可以适当使用 emoji，但不要超过1个
+    5. 不要用"亲"、"宝"等过于亲昵的称呼
+
+    返回 JSON 格式: { "reply": "你的回复" }
+  `;
+
+  try {
+    let jsonString = "{}";
+
+    if (CURRENT_PROVIDER === 'DEEPSEEK') {
+      console.log("Using DeepSeek for AI Reply...");
+      jsonString = await callDeepSeek(
+        "你是一位温暖细腻的倾听者，善于用简短的话给人力量。请只返回 JSON。",
+        promptText
+      );
+    } else {
+      throw new Error("Gemini provider not configured. Please use DEEPSEEK.");
+    }
+
+    const result = JSON.parse(cleanJsonString(jsonString));
+    return result.reply || "我听到你了 💫";
+  } catch (error) {
+    console.error(`AI Reply generation failed (${CURRENT_PROVIDER}):`, error);
+    return ""; // 失败时返回空，不显示回复
   }
 };
