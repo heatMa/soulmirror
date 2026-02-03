@@ -12,7 +12,7 @@ interface Props {
 }
 
 const TimelineItem: React.FC<Props> = ({ entry, moodConfig, isLast, onEdit, onDelete }) => {
-  const [isExpanded, setIsExpanded] = useState(true);
+  const [isCollapsed, setIsCollapsed] = useState(false); // 完全折叠状态
   const [swipeOffset, setSwipeOffset] = useState(0);
   const [showDeleteBtn, setShowDeleteBtn] = useState(false);
 
@@ -34,6 +34,13 @@ const TimelineItem: React.FC<Props> = ({ entry, moodConfig, isLast, onEdit, onDe
   };
 
   const timeString = date.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
+
+  // 切换折叠状态
+  const toggleCollapse = () => {
+    if (!showDeleteBtn) {
+      setIsCollapsed(!isCollapsed);
+    }
+  };
 
   // 触摸开始
   const handleTouchStart = (e: React.TouchEvent) => {
@@ -146,9 +153,18 @@ const TimelineItem: React.FC<Props> = ({ entry, moodConfig, isLast, onEdit, onDe
       >
         {/* Left Timeline Line */}
         <div className="flex flex-col items-center">
-          {/* The Emoji Node */}
-          <div className="z-10 w-6 h-6 mt-1 flex items-center justify-center text-base">
-             {moodConfig.emoji}
+          {/* 折叠三角按钮 */}
+          <div
+            className="z-10 w-6 h-6 mt-1 flex items-center justify-center cursor-pointer"
+            onClick={(e) => { e.stopPropagation(); toggleCollapse(); }}
+          >
+            <svg
+              className={`w-3 h-3 text-emerald-400 transition-transform duration-200 ${isCollapsed ? '-rotate-90' : 'rotate-0'}`}
+              fill="currentColor"
+              viewBox="0 0 20 20"
+            >
+              <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
+            </svg>
           </div>
 
           {/* The Vertical Line */}
@@ -158,10 +174,18 @@ const TimelineItem: React.FC<Props> = ({ entry, moodConfig, isLast, onEdit, onDe
         </div>
 
         {/* Right Content */}
-        <div className="flex-1 pb-8">
-           {/* Header: Label, Time, Edit */}
-           <div className="flex items-center justify-between mb-2">
-              <div className="flex items-center gap-3">
+        <div className={`flex-1 ${isCollapsed ? 'pb-4' : 'pb-8'}`}>
+           {/* Header: Emoji, Label, Time, Score, Edit - 可点击折叠 */}
+           <div
+             className="flex items-center justify-between cursor-pointer"
+             onClick={(e) => {
+               // 不阻止冒泡，让整行都可以点击折叠
+               if (!showDeleteBtn) toggleCollapse();
+             }}
+           >
+              <div className="flex items-center gap-2">
+                 {/* Emoji */}
+                 <span className="text-base">{moodConfig.emoji}</span>
                  <span className={`text-base font-bold ${getTextColor()}`}>
                    {entry.mood}
                  </span>
@@ -185,43 +209,36 @@ const TimelineItem: React.FC<Props> = ({ entry, moodConfig, isLast, onEdit, onDe
               </button>
            </div>
 
-           {/* Content Body */}
-           <div
-             className="text-gray-600 text-[15px] leading-7 font-medium cursor-pointer select-none"
-             onClick={(e) => {
-               e.stopPropagation();
-               if (!showDeleteBtn) setIsExpanded(!isExpanded);
-             }}
-           >
-              <div
-                className={`transition-all duration-300 ${!isExpanded ? 'line-clamp-2' : ''}`}
-                dangerouslySetInnerHTML={{ __html: entry.content }}
-              />
-              {!isExpanded && (
-                 <div className="text-xs text-emerald-500 font-bold mt-1">展开全文</div>
-              )}
-           </div>
+           {/* Content Body - 折叠时隐藏 */}
+           {!isCollapsed && (
+             <>
+               <div
+                 className="text-gray-600 text-[15px] leading-7 font-medium mt-2"
+                 dangerouslySetInnerHTML={{ __html: entry.content }}
+               />
 
-           {/* AI 暖心回复 */}
-           {entry.aiReply && (
-             <div className="mt-3 pl-3 border-l-2 border-emerald-200">
-               <p className="text-sm text-emerald-600 italic">
-                 <span className="not-italic mr-1">🤖</span>
-                 {entry.aiReply}
-               </p>
-             </div>
-           )}
+               {/* AI 暖心回复 */}
+               {entry.aiReply && (
+                 <div className="mt-3 pl-3 border-l-2 border-emerald-200">
+                   <p className="text-sm text-emerald-600 italic">
+                     <span className="not-italic mr-1">🤖</span>
+                     {entry.aiReply}
+                   </p>
+                 </div>
+               )}
 
-           {/* AI 情绪调节建议（仅负面情绪时显示） */}
-           {entry.aiSuggestions && entry.aiSuggestions.length > 0 && (
-             <div className="mt-3 bg-amber-50 rounded-xl p-3">
-               <div className="text-xs font-bold text-amber-600 mb-2">💡 试试这样做：</div>
-               <ul className="space-y-1">
-                 {entry.aiSuggestions.map((suggestion, index) => (
-                   <li key={index} className="text-sm text-amber-700">• {suggestion}</li>
-                 ))}
-               </ul>
-             </div>
+               {/* AI 情绪调节建议（仅负面情绪时显示） */}
+               {entry.aiSuggestions && entry.aiSuggestions.length > 0 && (
+                 <div className="mt-3 bg-amber-50 rounded-xl p-3">
+                   <div className="text-xs font-bold text-amber-600 mb-2">💡 试试这样做：</div>
+                   <ul className="space-y-1">
+                     {entry.aiSuggestions.map((suggestion, index) => (
+                       <li key={index} className="text-sm text-amber-700">• {suggestion}</li>
+                     ))}
+                   </ul>
+                 </div>
+               )}
+             </>
            )}
         </div>
       </div>
