@@ -7,43 +7,69 @@ import { MoodOption } from "../constants";
 
 // 选项: 'GEMINI' | 'DEEPSEEK'
 // 部署安卓时，如果 Gemini 不可用，请改为 'DEEPSEEK'
-const CURRENT_PROVIDER: 'GEMINI' | 'DEEPSEEK' = 'DEEPSEEK'; 
+const CURRENT_PROVIDER: 'GEMINI' | 'DEEPSEEK' = 'DEEPSEEK';
 
 // ==========================================
-// 🔑 API Keys 配置
+// 🔑 API 配置
 // ==========================================
 
-// Google Gemini API Key
+// Google Gemini API Key (如需使用 Gemini，请配置)
 const GEMINI_API_KEY = "YOUR_GEMINI_API_KEY_HERE";
 
-// DeepSeek API Key (已填入你提供的 Key)
-const DEEPSEEK_API_KEY = "sk-cbbf0f33f1ea4a619570199acc64fe3d";
+// ==========================================
+// 🌐 API 端点配置
+// ==========================================
+
+// Cloudflare Worker 代理地址 (用于网页版部署，保护 API Key)
+// 部署后请替换为你的 Worker URL，格式: https://your-worker-name.your-subdomain.workers.dev
+const AI_PROXY_URL = import.meta.env.VITE_AI_PROXY_URL || "";
+
+// DeepSeek 直连地址 (用于本地开发或 Android 原生应用)
+const DEEPSEEK_DIRECT_URL = "https://api.deepseek.com/chat/completions";
+const DEEPSEEK_API_KEY = import.meta.env.VITE_DEEPSEEK_API_KEY || "";
+
+// 是否使用代理模式 (网页版部署时设为 true)
+const USE_PROXY = !!AI_PROXY_URL;
 
 // ==========================================
 // 🐳 DeepSeek 帮助函数
 // ==========================================
-const DEEPSEEK_API_URL = "https://api.deepseek.com/chat/completions";
 
 async function callDeepSeek(systemPrompt: string, userPrompt: string): Promise<string> {
-  if (!DEEPSEEK_API_KEY) throw new Error("DeepSeek API Key 未配置");
+  const requestBody = {
+    model: "deepseek-chat",
+    messages: [
+      { role: "system", content: systemPrompt },
+      { role: "user", content: userPrompt }
+    ],
+    response_format: { type: "json_object" },
+    temperature: 1.3
+  };
 
   try {
-    const response = await fetch(DEEPSEEK_API_URL, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${DEEPSEEK_API_KEY}`
-      },
-      body: JSON.stringify({
-        model: "deepseek-chat",
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: userPrompt }
-        ],
-        response_format: { type: "json_object" }, // 强制 JSON 模式
-        temperature: 1.3 // DeepSeek 建议稍微高一点的温度以获得更有创意的结果
-      })
-    });
+    let response: Response;
+
+    if (USE_PROXY) {
+      // 代理模式：通过 Cloudflare Worker 转发请求
+      console.log("Using AI Proxy...");
+      response = await fetch(AI_PROXY_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(requestBody)
+      });
+    } else {
+      // 直连模式：本地开发或 Android 原生应用
+      if (!DEEPSEEK_API_KEY) throw new Error("DeepSeek API Key 未配置");
+      console.log("Using DeepSeek Direct...");
+      response = await fetch(DEEPSEEK_DIRECT_URL, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${DEEPSEEK_API_KEY}`
+        },
+        body: JSON.stringify(requestBody)
+      });
+    }
 
     if (!response.ok) {
       const errText = await response.text();
