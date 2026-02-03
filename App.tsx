@@ -5,7 +5,6 @@ import DiaryEntryForm from './components/DiaryEntryForm';
 import Dashboard from './components/Dashboard';
 import CalendarStrip from './components/CalendarStrip';
 import DailyMoodChart from './components/DailyMoodChart';
-import DailyNoteEditor from './components/DailyNoteEditor';
 import TimelineItem from './components/TimelineItem';
 import { ICONS, MOOD_OPTIONS, MoodOption } from './constants';
 import { evaluateMoodScore, generateAiReply, generateRegulationSuggestions } from './services/geminiService';
@@ -274,18 +273,10 @@ const App: React.FC = () => {
     return selectedDate.toLocaleDateString('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit' }).replace(/\//g, '-');
   };
 
-  const currentDailyNote = dailyNotes[getSelectedDateStr()] || '';
-
   const copyDailySummary = () => {
-    if (timelineEntries.length === 0 && !currentDailyNote) return;
+    if (timelineEntries.length === 0) return;
     const dateStr = selectedDate.toLocaleDateString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric' });
     let summaryText = "";
-    if (currentDailyNote) {
-       const tempDiv = document.createElement("div");
-       tempDiv.innerHTML = currentDailyNote;
-       const noteText = tempDiv.innerText;
-       summaryText += `📝 每日随笔：\n${noteText}\n\n`;
-    }
     if (timelineEntries.length > 0) {
         const entriesText = timelineEntries
           .map(entry => {
@@ -381,15 +372,6 @@ const App: React.FC = () => {
               </div>
             )}
             
-            {/* Daily Rich Text Note */}
-            <div className="mb-6 animate-in fade-in slide-in-from-bottom-6 duration-700 delay-100">
-              <DailyNoteEditor 
-                dateStr={getSelectedDateStr()}
-                initialContent={currentDailyNote}
-                onSave={saveDailyNote}
-              />
-            </div>
-
             {timelineEntries.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-10 text-center animate-in fade-in duration-1000">
                  <div className="text-gray-300 text-sm font-medium">
