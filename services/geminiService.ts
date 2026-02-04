@@ -20,16 +20,16 @@ const GEMINI_API_KEY = "YOUR_GEMINI_API_KEY_HERE";
 // 🌐 API 端点配置
 // ==========================================
 
-// Cloudflare Worker 代理地址 (用于网页版部署，保护 API Key)
-// 部署后请替换为你的 Worker URL，格式: https://your-worker-name.your-subdomain.workers.dev
-const AI_PROXY_URL = import.meta.env.VITE_AI_PROXY_URL || "";
+// Cloudflare Pages Function 代理地址 (同域名，避免跨域问题)
+// 优先使用环境变量配置，否则使用同域名的 /api/chat 路由
+const AI_PROXY_URL = import.meta.env.VITE_AI_PROXY_URL || "/api/chat";
 
 // DeepSeek 直连地址 (用于本地开发或 Android 原生应用)
 const DEEPSEEK_DIRECT_URL = "https://api.deepseek.com/chat/completions";
 const DEEPSEEK_API_KEY = import.meta.env.VITE_DEEPSEEK_API_KEY || "";
 
-// 是否使用代理模式 (网页版部署时设为 true)
-const USE_PROXY = !!AI_PROXY_URL;
+// 是否使用代理模式：有 API Key 时直连，否则使用代理
+const USE_PROXY = !DEEPSEEK_API_KEY;
 
 // ==========================================
 // 🐳 DeepSeek 帮助函数
