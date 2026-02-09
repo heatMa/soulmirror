@@ -260,15 +260,15 @@ const DailyMoodChart: React.FC<Props> = ({ entries, customMoods = [] }) => {
               ticks={[0, 5, 10]}
             />
             <ReferenceLine x={currentHour} stroke="#e5e7eb" strokeDasharray="3 3" />
-            {/* 平均分虚线 */}
+            {/* 平均分虚线 - 标签放左边只显示数字 */}
             <ReferenceLine
               y={averageScore}
               stroke="#f43f5e"
               strokeDasharray="6 4"
               strokeWidth={1.5}
               label={{
-                value: `平均 ${averageScore.toFixed(1)}`,
-                position: 'right',
+                value: averageScore.toFixed(1),
+                position: 'left',
                 fontSize: 9,
                 fill: '#f43f5e',
                 fontWeight: 'bold'
