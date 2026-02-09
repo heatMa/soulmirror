@@ -26,7 +26,8 @@ export interface AIAnalysis {
 
 export enum ViewMode {
   TIMELINE = 'timeline',
-  ANALYSIS = 'analysis'
+  ANALYSIS = 'analysis',
+  STATISTICS = 'statistics'
 }
 
 // 备份数据接口

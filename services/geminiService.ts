@@ -101,18 +101,20 @@ export const generateMoodMetadata = async (moodLabel: string): Promise<Partial<M
   const promptText = `
     用户输入了一个新的心情标签： "${moodLabel}"。
     请根据这个词的语义，生成以下元数据。
-    
+
     必须严格返回合法的 JSON 格式，不要包含任何 markdown 标记。
     JSON 结构如下:
     {
       "emoji": "最能代表这个心情的 emoji",
       "color": "Tailwind CSS 背景颜色类名 (如 bg-emerald-500, bg-rose-500)",
+      "hexColor": "对应的 hex 颜色值 (如 #10b981, #f43f5e)",
       "score": 1-10 的整数评分
     }
 
     颜色规则:
-    - 正面/平静 -> 绿色、青色、蓝绿色系
-    - 负面/激烈 -> 紫色、黄色、红色系
+    - 正面/平静 -> 绿色、青色、蓝绿色系 (bg-emerald-500/#10b981, bg-teal-500/#14b8a6, bg-sky-400/#38bdf8)
+    - 负面/激烈 -> 紫色、黄色、红色系 (bg-purple-500/#a855f7, bg-amber-500/#f59e0b, bg-rose-500/#f43f5e)
+    - 中性/平淡 -> 灰色、蓝灰色系 (bg-slate-500/#64748b, bg-gray-400/#9ca3af)
     评分规则:
     - 1-4: 负面, 5-6: 中性, 7-10: 正面
   `;
@@ -123,7 +125,7 @@ export const generateMoodMetadata = async (moodLabel: string): Promise<Partial<M
     if (CURRENT_PROVIDER === 'DEEPSEEK') {
       console.log("Using DeepSeek for Metadata...");
       jsonString = await callDeepSeek(
-        "你是一个辅助生成 UI 样式的 JSON 生成器。", 
+        "你是一个辅助生成 UI 样式的 JSON 生成器。",
         promptText
       );
     } else {
@@ -135,6 +137,7 @@ export const generateMoodMetadata = async (moodLabel: string): Promise<Partial<M
     return {
       emoji: result.emoji || '🏷️',
       color: result.color || 'bg-slate-400',
+      hexColor: result.hexColor || '#94a3b8',
       score: result.score || 5
     };
   } catch (error) {
@@ -142,6 +145,7 @@ export const generateMoodMetadata = async (moodLabel: string): Promise<Partial<M
     return {
       emoji: '🏷️',
       color: 'bg-slate-400',
+      hexColor: '#94a3b8',
       score: 5
     };
   }
@@ -329,5 +333,131 @@ export const generateAiReply = async (mood: string, content: string): Promise<st
   } catch (error) {
     console.error(`AI Reply generation failed (${CURRENT_PROVIDER}):`, error);
     return ""; // 失败时返回空，不显示回复
+  }
+};
+
+// 周报接口
+export interface WeeklyReport {
+  period: string;
+  overallEmoji: string;
+  summary: string;
+  negativePeaks: {
+    period: string;
+    frequency: number;
+    commonMoods: string[];
+  }[];
+  suggestions: string[];
+}
+
+// 生成 AI 情绪周报
+export const generateWeeklyReport = async (entries: DiaryEntry[]): Promise<WeeklyReport> => {
+  if (entries.length === 0) {
+    return {
+      period: '过去一周',
+      overallEmoji: '📭',
+      summary: '这周还没有记录，开始记录你的心情吧！',
+      negativePeaks: [],
+      suggestions: ['每天花几分钟记录心情，帮助你更好地了解自己']
+    };
+  }
+
+  // 按时间段分析数据
+  const timeAnalysis: Record<string, { count: number; negativeMoods: string[]; scores: number[] }> = {};
+  const periods = ['凌晨(0-6点)', '早晨(6-9点)', '上午(9-12点)', '中午(12-14点)', '下午(14-18点)', '傍晚(18-21点)', '深夜(21-24点)'];
+
+  periods.forEach(p => {
+    timeAnalysis[p] = { count: 0, negativeMoods: [], scores: [] };
+  });
+
+  entries.forEach(entry => {
+    const hour = new Date(entry.timestamp).getHours();
+    let period = '';
+    if (hour < 6) period = '凌晨(0-6点)';
+    else if (hour < 9) period = '早晨(6-9点)';
+    else if (hour < 12) period = '上午(9-12点)';
+    else if (hour < 14) period = '中午(12-14点)';
+    else if (hour < 18) period = '下午(14-18点)';
+    else if (hour < 21) period = '傍晚(18-21点)';
+    else period = '深夜(21-24点)';
+
+    timeAnalysis[period].count++;
+    timeAnalysis[period].scores.push(entry.moodScore);
+    if (entry.moodScore <= 5) {
+      timeAnalysis[period].negativeMoods.push(entry.mood);
+    }
+  });
+
+  const entriesSummary = entries.map(e => ({
+    time: new Date(e.timestamp).toLocaleString('zh-CN'),
+    mood: e.mood,
+    score: e.moodScore,
+    content: e.content.substring(0, 50)
+  }));
+
+  const promptText = `
+    以下是用户过去一周的心情记录数据：
+
+    时间段分析：
+    ${JSON.stringify(timeAnalysis, null, 2)}
+
+    详细记录（部分）：
+    ${JSON.stringify(entriesSummary.slice(0, 15), null, 2)}
+
+    请分析用户的情绪周报，重点关注：
+    1. 负面情绪（评分≤5）在哪些时间段更容易出现？
+    2. 这些时间段出现负面情绪的可能原因是什么？
+    3. 针对这些高发时段给出具体可执行的建议
+
+    返回 JSON 格式：
+    {
+      "period": "分析的时间范围，如 2月1日-2月7日",
+      "overallEmoji": "最能代表这周情绪的 emoji",
+      "summary": "50字以内的整体情绪概括",
+      "negativePeaks": [
+        {
+          "period": "时间段名称",
+          "frequency": 出现次数,
+          "commonMoods": ["常见的负面情绪标签"]
+        }
+      ],
+      "suggestions": ["针对性建议1", "建议2", "建议3"]
+    }
+
+    要求：
+    - negativePeaks 只列出负面情绪出现次数≥2的时间段，按频率从高到低排序
+    - suggestions 要具体、可执行，与高发时段相关联
+    - 语气温和鼓励，不要说教
+  `;
+
+  try {
+    let jsonString = "{}";
+
+    if (CURRENT_PROVIDER === 'DEEPSEEK') {
+      console.log("Using DeepSeek for Weekly Report...");
+      jsonString = await callDeepSeek(
+        "你是一位专业的心理数据分析师，擅长从情绪数据中发现规律并给出建设性建议。请只返回 JSON。",
+        promptText
+      );
+    } else {
+      throw new Error("Gemini provider not configured. Please use DEEPSEEK.");
+    }
+
+    const result = JSON.parse(cleanJsonString(jsonString));
+    return {
+      period: result.period || '过去一周',
+      overallEmoji: result.overallEmoji || '📊',
+      summary: result.summary || '这周的情绪数据已收集完成',
+      negativePeaks: result.negativePeaks || [],
+      suggestions: result.suggestions || []
+    };
+  } catch (error) {
+    console.error(`Weekly report generation failed (${CURRENT_PROVIDER}):`, error);
+    return {
+      period: '过去一周',
+      overallEmoji: '❌',
+      summary: '周报生成失败，请稍后重试',
+      negativePeaks: [],
+      suggestions: []
+    };
   }
 };

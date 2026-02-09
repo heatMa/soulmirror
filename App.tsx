@@ -6,6 +6,7 @@ import Dashboard from './components/Dashboard';
 import CalendarStrip from './components/CalendarStrip';
 import DailyMoodChart from './components/DailyMoodChart';
 import TimelineItem from './components/TimelineItem';
+import Statistics from './components/Statistics';
 import { ICONS, MOOD_OPTIONS, MoodOption } from './constants';
 import { evaluateMoodScore, generateAiReply, generateRegulationSuggestions } from './services/geminiService';
 import { databaseService } from './services/databaseService';
@@ -254,6 +255,7 @@ const App: React.FC = () => {
       score: entry?.moodScore || 5,
       emoji: entry?.moodEmoji || '🏷️',
       color: 'bg-gray-400',
+      hexColor: '#9ca3af',
       shadow: 'shadow-gray-200',
       suggestions: []
     };
@@ -368,7 +370,7 @@ const App: React.FC = () => {
             {/* Daily Mood Chart */}
             {timelineEntries.length > 0 && (
               <div className="mb-6 h-48 animate-in fade-in slide-in-from-bottom-6 duration-700">
-                 <DailyMoodChart entries={timelineEntries} />
+                 <DailyMoodChart entries={timelineEntries} customMoods={customMoods} />
               </div>
             )}
             
@@ -399,13 +401,15 @@ const App: React.FC = () => {
             )}
           </main>
         </>
-      ) : (
+      ) : viewMode === ViewMode.ANALYSIS ? (
         <div className="flex-1 px-4 pt-safe-top pb-24 overflow-y-auto no-scrollbar">
            <div className="flex justify-between items-center mb-6 px-2">
               <h2 className="text-2xl font-bold text-gray-800 tracking-tight">AI 情绪洞察</h2>
            </div>
           <Dashboard entries={entries} onDataRestored={handleDataRestored} />
         </div>
+      ) : (
+        <Statistics entries={entries} customMoods={customMoods} />
       )}
 
       {/* Floating Action Button */}
@@ -430,6 +434,19 @@ const App: React.FC = () => {
           >
             <div className={`transition-transform duration-300 ${viewMode === ViewMode.TIMELINE ? 'scale-110 -translate-y-1' : ''}`}>
                <ICONS.Home />
+            </div>
+          </button>
+
+          <div className="w-[1px] h-8 bg-gray-200/50"></div>
+
+          <button
+            onClick={() => setViewMode(ViewMode.STATISTICS)}
+            className={`flex flex-col items-center justify-center w-full h-full gap-1 transition-colors ${
+              viewMode === ViewMode.STATISTICS ? 'text-gray-900' : 'text-gray-400 hover:text-gray-600'
+            }`}
+          >
+            <div className={`transition-transform duration-300 ${viewMode === ViewMode.STATISTICS ? 'scale-110 -translate-y-1' : ''}`}>
+              <ICONS.Stats />
             </div>
           </button>
 
