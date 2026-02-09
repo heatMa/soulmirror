@@ -5,6 +5,7 @@ import DiaryEntryForm from './components/DiaryEntryForm';
 import Dashboard from './components/Dashboard';
 import CalendarStrip from './components/CalendarStrip';
 import DailyMoodChart from './components/DailyMoodChart';
+import EnergyBattery from './components/EnergyBattery';
 import TimelineItem from './components/TimelineItem';
 import Statistics from './components/Statistics';
 import { ICONS, MOOD_OPTIONS, MoodOption } from './constants';
@@ -345,7 +346,7 @@ const App: React.FC = () => {
             onSelectDate={setSelectedDate} 
           />
           
-          <main className="flex-1 px-4 pt-4 pb-28 overflow-y-auto no-scrollbar">
+          <main className="flex-1 px-2 pt-4 pb-28 overflow-y-auto no-scrollbar">
             {/* Header Greeting & Actions */}
             <div className="mb-6 mt-2 px-2 animate-in fade-in slide-in-from-bottom-4 duration-700 flex justify-between items-end">
                <div>
@@ -369,10 +370,15 @@ const App: React.FC = () => {
 
             {/* Daily Mood Chart */}
             {timelineEntries.length > 0 && (
-              <div className="mb-6 h-48 animate-in fade-in slide-in-from-bottom-6 duration-700">
+              <div className="mb-4 h-48 animate-in fade-in slide-in-from-bottom-6 duration-700">
                  <DailyMoodChart entries={timelineEntries} customMoods={customMoods} />
               </div>
             )}
+
+            {/* Energy Battery */}
+            <div className="mb-6 animate-in fade-in slide-in-from-bottom-6 duration-700">
+               <EnergyBattery entries={timelineEntries} allEntries={entries} />
+            </div>
             
             {timelineEntries.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-10 text-center animate-in fade-in duration-1000">
@@ -381,7 +387,7 @@ const App: React.FC = () => {
                  </div>
               </div>
             ) : (
-              <div className="glass-card rounded-[32px] p-6 animate-in slide-in-from-bottom-8 duration-500 min-h-[200px]">
+              <div className="glass-card rounded-[32px] p-4 animate-in slide-in-from-bottom-8 duration-500 min-h-[200px]">
                 {timelineEntries.map((entry, index) => {
                   const moodConfig = getMoodConfig(entry.mood, entry);
                   const isLast = index === timelineEntries.length - 1;
