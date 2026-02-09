@@ -40,8 +40,14 @@ CREATE TABLE IF NOT EXISTS custom_moods (
   score INTEGER DEFAULT 5,
   emoji TEXT NOT NULL,
   color TEXT NOT NULL,
+  hex_color TEXT,
   shadow TEXT NOT NULL,
   suggestions TEXT DEFAULT '[]'
+);
+
+CREATE TABLE IF NOT EXISTS user_settings (
+  key TEXT PRIMARY KEY,
+  value TEXT NOT NULL
 );
 
 CREATE INDEX IF NOT EXISTS idx_entries_timestamp ON diary_entries(timestamp);
@@ -132,6 +138,24 @@ class DatabaseService {
         await this.db.execute('ALTER TABLE diary_entries ADD COLUMN ai_suggestions TEXT');
         console.log('数据库迁移：添加 ai_suggestions 列');
       }
+
+      // 检查 custom_moods 表是否有 hex_color 列
+      const moodsTableInfo = await this.db.query("PRAGMA table_info(custom_moods)");
+      const moodsColumns = moodsTableInfo.values || [];
+      const hasHexColor = moodsColumns.some((col: any) => col.name === 'hex_color');
+
+      if (!hasHexColor) {
+        await this.db.execute('ALTER TABLE custom_moods ADD COLUMN hex_color TEXT');
+        console.log('数据库迁移：添加 hex_color 列');
+      }
+
+      // 确保 user_settings 表存在
+      await this.db.execute(`
+        CREATE TABLE IF NOT EXISTS user_settings (
+          key TEXT PRIMARY KEY,
+          value TEXT NOT NULL
+        )
+      `);
     } catch (error) {
       console.error('数据库迁移失败:', error);
     }
@@ -371,6 +395,7 @@ class DatabaseService {
         score: row.score as number,
         emoji: row.emoji as string,
         color: row.color as string,
+        hexColor: row.hex_color as string | undefined,
         shadow: row.shadow as string,
         suggestions: JSON.parse((row.suggestions as string) || '[]')
       }));
@@ -388,9 +413,9 @@ class DatabaseService {
 
     if (this.isNative && this.db) {
       await this.db.run(
-        `INSERT OR REPLACE INTO custom_moods (label, value, score, emoji, color, shadow, suggestions) 
-         VALUES (?, ?, ?, ?, ?, ?, ?)`,
-        [mood.label, mood.value, mood.score, mood.emoji, mood.color, mood.shadow, JSON.stringify(mood.suggestions)]
+        `INSERT OR REPLACE INTO custom_moods (label, value, score, emoji, color, hex_color, shadow, suggestions)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        [mood.label, mood.value, mood.score, mood.emoji, mood.color, mood.hexColor || null, mood.shadow, JSON.stringify(mood.suggestions)]
       );
     } else {
       const moods = await this.getCustomMoods();

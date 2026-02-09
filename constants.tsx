@@ -6,19 +6,57 @@ export interface MoodOption {
   value: string;
   score: number;
   emoji: string;
-  color: string; // Background color class for the tag/card
+  color: string; // Background color class for the tag/card (Tailwind class)
+  hexColor?: string; // Hex color value for dynamic styling (charts, borders, etc.)
   shadow: string; // Shadow color class
   suggestions: string[];
 }
 
+// 预设色板 - 用于自定义心情颜色选择
+export const MOOD_COLOR_PALETTE = [
+  { hex: '#10b981', name: '翠绿', tailwind: 'bg-emerald-500' },
+  { hex: '#38bdf8', name: '天蓝', tailwind: 'bg-sky-400' },
+  { hex: '#64748b', name: '石墨', tailwind: 'bg-slate-500' },
+  { hex: '#818cf8', name: '靛蓝', tailwind: 'bg-indigo-400' },
+  { hex: '#f59e0b', name: '琥珀', tailwind: 'bg-amber-500' },
+  { hex: '#3b82f6', name: '蔚蓝', tailwind: 'bg-blue-500' },
+  { hex: '#f43f5e', name: '玫红', tailwind: 'bg-rose-500' },
+  { hex: '#a855f7', name: '紫罗兰', tailwind: 'bg-purple-500' },
+  { hex: '#ec4899', name: '粉红', tailwind: 'bg-pink-500' },
+  { hex: '#14b8a6', name: '青绿', tailwind: 'bg-teal-500' },
+  { hex: '#f97316', name: '橙色', tailwind: 'bg-orange-500' },
+  { hex: '#84cc16', name: '青柠', tailwind: 'bg-lime-500' },
+];
+
+// 从 Tailwind class 获取对应的 hex 颜色
+export const getHexFromTailwind = (tailwindClass: string): string => {
+  const mapping: Record<string, string> = {
+    'bg-emerald-500': '#10b981',
+    'bg-sky-400': '#38bdf8',
+    'bg-slate-400': '#94a3b8',
+    'bg-slate-500': '#64748b',
+    'bg-indigo-400': '#818cf8',
+    'bg-amber-500': '#f59e0b',
+    'bg-blue-500': '#3b82f6',
+    'bg-rose-500': '#f43f5e',
+    'bg-purple-500': '#a855f7',
+    'bg-pink-500': '#ec4899',
+    'bg-teal-500': '#14b8a6',
+    'bg-orange-500': '#f97316',
+    'bg-lime-500': '#84cc16',
+    'bg-gray-400': '#9ca3af',
+  };
+  return mapping[tailwindClass] || '#64748b';
+};
+
 export const MOOD_OPTIONS: MoodOption[] = [
-  { label: '开心', value: 'happy', score: 9, emoji: '😊', color: 'bg-emerald-500', shadow: 'shadow-emerald-200', suggestions: ['顺利', '收获', '惊喜'] },
-  { label: '平静', value: 'calm', score: 7, emoji: '😌', color: 'bg-sky-400', shadow: 'shadow-sky-200', suggestions: ['放松', '舒适', '安心'] },
-  { label: '一般', value: 'normal', score: 5, emoji: '😐', color: 'bg-slate-400', shadow: 'shadow-slate-200', suggestions: ['普通', '日常', '平淡'] },
-  { label: '疲惫', value: 'tired', score: 4, emoji: '😩', color: 'bg-indigo-400', shadow: 'shadow-indigo-200', suggestions: ['累了', '困倦', '需要休息'] },
-  { label: '焦虑', value: 'anxious', score: 3, emoji: '😰', color: 'bg-amber-500', shadow: 'shadow-amber-200', suggestions: ['压力', '担心', '紧张'] },
-  { label: '难过', value: 'sad', score: 3, emoji: '😢', color: 'bg-blue-500', shadow: 'shadow-blue-200', suggestions: ['失落', '委屈', '伤心'] },
-  { label: '生气', value: 'angry', score: 2, emoji: '😠', color: 'bg-rose-500', shadow: 'shadow-rose-200', suggestions: ['不满', '烦躁', '愤怒'] },
+  { label: '开心', value: 'happy', score: 9, emoji: '😊', color: 'bg-emerald-500', hexColor: '#10b981', shadow: 'shadow-emerald-200', suggestions: ['顺利', '收获', '惊喜'] },
+  { label: '平静', value: 'calm', score: 7, emoji: '😌', color: 'bg-sky-400', hexColor: '#38bdf8', shadow: 'shadow-sky-200', suggestions: ['放松', '舒适', '安心'] },
+  { label: '一般', value: 'normal', score: 5, emoji: '😐', color: 'bg-slate-400', hexColor: '#94a3b8', shadow: 'shadow-slate-200', suggestions: ['普通', '日常', '平淡'] },
+  { label: '疲惫', value: 'tired', score: 4, emoji: '😩', color: 'bg-indigo-400', hexColor: '#818cf8', shadow: 'shadow-indigo-200', suggestions: ['累了', '困倦', '需要休息'] },
+  { label: '焦虑', value: 'anxious', score: 3, emoji: '😰', color: 'bg-amber-500', hexColor: '#f59e0b', shadow: 'shadow-amber-200', suggestions: ['压力', '担心', '紧张'] },
+  { label: '难过', value: 'sad', score: 3, emoji: '😢', color: 'bg-blue-500', hexColor: '#3b82f6', shadow: 'shadow-blue-200', suggestions: ['失落', '委屈', '伤心'] },
+  { label: '生气', value: 'angry', score: 2, emoji: '😠', color: 'bg-rose-500', hexColor: '#f43f5e', shadow: 'shadow-rose-200', suggestions: ['不满', '烦躁', '愤怒'] },
 ];
 
 export const ICONS = {
@@ -109,6 +147,11 @@ export const ICONS = {
   Backup: () => (
     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-4 h-4">
       <path strokeLinecap="round" strokeLinejoin="round" d="M20.25 6.375c0 2.278-3.694 4.125-8.25 4.125S3.75 8.653 3.75 6.375m16.5 0c0-2.278-3.694-4.125-8.25-4.125S3.75 4.097 3.75 6.375m16.5 0v11.25c0 2.278-3.694 4.125-8.25 4.125s-8.25-1.847-8.25-4.125V6.375m16.5 0v3.75m-16.5-3.75v3.75m16.5 0v3.75C20.25 16.153 16.556 18 12 18s-8.25-1.847-8.25-4.125v-3.75m16.5 0c0 2.278-3.694 4.125-8.25 4.125s-8.25-1.847-8.25-4.125" />
+    </svg>
+  ),
+  Stats: () => (
+    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-6 h-6">
+      <path strokeLinecap="round" strokeLinejoin="round" d="M7.5 14.25v2.25m3-4.5v4.5m3-6.75v6.75m3-9v9M6 20.25h12A2.25 2.25 0 0 0 20.25 18V6A2.25 2.25 0 0 0 18 3.75H6A2.25 2.25 0 0 0 3.75 6v12A2.25 2.25 0 0 0 6 20.25Z" />
     </svg>
   )
 };

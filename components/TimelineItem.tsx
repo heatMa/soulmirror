@@ -1,7 +1,7 @@
 
 import React, { useState, useRef } from 'react';
 import { DiaryEntry } from '../types';
-import { MoodOption, ICONS } from '../constants';
+import { MoodOption, ICONS, getHexFromTailwind } from '../constants';
 
 interface Props {
   entry: DiaryEntry;
@@ -25,13 +25,8 @@ const TimelineItem: React.FC<Props> = ({ entry, moodConfig, isLast, onEdit, onDe
 
   const date = new Date(entry.timestamp);
 
-  // 简单的文字颜色映射，模拟截图风格
-  const getTextColor = () => {
-     if (moodConfig.color.includes('rose') || moodConfig.color.includes('fuchsia')) return 'text-rose-500';
-     if (moodConfig.color.includes('amber')) return 'text-amber-600';
-     if (moodConfig.color.includes('emerald') || moodConfig.color.includes('teal')) return 'text-emerald-600';
-     return 'text-slate-600';
-  };
+  // 获取心情的 hex 颜色
+  const moodHexColor = moodConfig.hexColor || getHexFromTailwind(moodConfig.color);
 
   const timeString = date.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
 
@@ -153,23 +148,26 @@ const TimelineItem: React.FC<Props> = ({ entry, moodConfig, isLast, onEdit, onDe
       >
         {/* Left Timeline Line */}
         <div className="flex flex-col items-center">
-          {/* 折叠三角按钮 */}
+          {/* 折叠三角按钮 - 使用心情颜色 */}
           <div
             className="z-10 w-6 h-6 mt-1 flex items-center justify-center cursor-pointer"
             onClick={(e) => { e.stopPropagation(); toggleCollapse(); }}
           >
             <svg
-              className={`w-3 h-3 text-emerald-400 transition-transform duration-200 ${isCollapsed ? '-rotate-90' : 'rotate-0'}`}
-              fill="currentColor"
+              className={`w-3 h-3 transition-transform duration-200 ${isCollapsed ? '-rotate-90' : 'rotate-0'}`}
+              fill={moodHexColor}
               viewBox="0 0 20 20"
             >
               <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
             </svg>
           </div>
 
-          {/* The Vertical Line */}
+          {/* The Vertical Line - 使用心情颜色 */}
           {!isLast && (
-            <div className="flex-1 w-[2px] bg-emerald-100/80 my-1 rounded-full"></div>
+            <div
+              className="flex-1 w-[2px] my-1 rounded-full"
+              style={{ backgroundColor: moodHexColor, opacity: 0.3 }}
+            ></div>
           )}
         </div>
 
@@ -186,7 +184,10 @@ const TimelineItem: React.FC<Props> = ({ entry, moodConfig, isLast, onEdit, onDe
               <div className="flex items-center gap-2">
                  {/* Emoji */}
                  <span className="text-base">{moodConfig.emoji}</span>
-                 <span className={`text-base font-bold ${getTextColor()}`}>
+                 <span
+                   className="text-base font-bold"
+                   style={{ color: moodHexColor }}
+                 >
                    {entry.mood}
                  </span>
                  <div className="flex items-baseline gap-2">
@@ -194,7 +195,10 @@ const TimelineItem: React.FC<Props> = ({ entry, moodConfig, isLast, onEdit, onDe
                        {timeString}
                      </span>
                      {entry.moodScore > 0 && (
-                       <span className={`text-sm font-bold ${getTextColor()}`}>
+                       <span
+                         className="text-sm font-bold"
+                         style={{ color: moodHexColor }}
+                       >
                          {entry.moodScore.toFixed(1)}分
                        </span>
                      )}
@@ -203,7 +207,8 @@ const TimelineItem: React.FC<Props> = ({ entry, moodConfig, isLast, onEdit, onDe
 
               <button
                 onClick={(e) => { e.stopPropagation(); onEdit(entry); }}
-                className="p-1.5 text-emerald-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-full transition-colors"
+                className="p-1.5 hover:bg-gray-50 rounded-full transition-colors"
+                style={{ color: moodHexColor }}
               >
                  <ICONS.Pen />
               </button>
@@ -217,10 +222,16 @@ const TimelineItem: React.FC<Props> = ({ entry, moodConfig, isLast, onEdit, onDe
                  dangerouslySetInnerHTML={{ __html: entry.content }}
                />
 
-               {/* AI 暖心回复 */}
+               {/* AI 暖心回复 - 使用心情颜色 */}
                {entry.aiReply && (
-                 <div className="mt-3 pl-3 border-l-2 border-emerald-200">
-                   <p className="text-sm text-emerald-600 italic">
+                 <div
+                   className="mt-3 pl-3 border-l-2"
+                   style={{ borderColor: moodHexColor, opacity: 0.8 }}
+                 >
+                   <p
+                     className="text-sm italic"
+                     style={{ color: moodHexColor }}
+                   >
                      <span className="not-italic mr-1">🤖</span>
                      {entry.aiReply}
                    </p>
@@ -229,11 +240,25 @@ const TimelineItem: React.FC<Props> = ({ entry, moodConfig, isLast, onEdit, onDe
 
                {/* AI 情绪调节建议（仅负面情绪时显示） */}
                {entry.aiSuggestions && entry.aiSuggestions.length > 0 && (
-                 <div className="mt-3 bg-amber-50 rounded-xl p-3">
-                   <div className="text-xs font-bold text-amber-600 mb-2">💡 试试这样做：</div>
+                 <div
+                   className="mt-3 rounded-xl p-3"
+                   style={{ backgroundColor: `${moodHexColor}15` }}
+                 >
+                   <div
+                     className="text-xs font-bold mb-2"
+                     style={{ color: moodHexColor }}
+                   >
+                     💡 试试这样做：
+                   </div>
                    <ul className="space-y-1">
                      {entry.aiSuggestions.map((suggestion, index) => (
-                       <li key={index} className="text-sm text-amber-700">• {suggestion}</li>
+                       <li
+                         key={index}
+                         className="text-sm"
+                         style={{ color: moodHexColor }}
+                       >
+                         • {suggestion}
+                       </li>
                      ))}
                    </ul>
                  </div>

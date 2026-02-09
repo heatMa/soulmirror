@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { DiaryEntry } from '../types';
-import { MOOD_OPTIONS, MoodOption, ICONS } from '../constants';
+import { MOOD_OPTIONS, MoodOption, ICONS, MOOD_COLOR_PALETTE, getHexFromTailwind } from '../constants';
 import { generateMoodMetadata } from '../services/geminiService';
 import { databaseService } from '../services/databaseService';
 
@@ -28,6 +28,8 @@ const DiaryEntryForm: React.FC<Props> = ({ initialData, onSave, onClose }) => {
   const [newMoodInput, setNewMoodInput] = useState('');
   const [isAddingMood, setIsAddingMood] = useState(false);
   const [isGeneratingTag, setIsGeneratingTag] = useState(false);
+  const [isRegenerating, setIsRegenerating] = useState(false);
+  const [showColorPicker, setShowColorPicker] = useState<string | null>(null); // 存储正在编辑颜色的心情 label
   const [activeColor, setActiveColor] = useState<string>('#374151');
   const contentRef = useRef<HTMLDivElement>(null);
 
@@ -108,6 +110,7 @@ const DiaryEntryForm: React.FC<Props> = ({ initialData, onSave, onClose }) => {
         score: metadata.score || 5,
         emoji: metadata.emoji || '🏷️',
         color: metadata.color || 'bg-slate-400',
+        hexColor: metadata.hexColor || '#94a3b8',
         shadow: `shadow-gray-200`,
         suggestions: []
       };
@@ -121,6 +124,52 @@ const DiaryEntryForm: React.FC<Props> = ({ initialData, onSave, onClose }) => {
     } finally {
       setIsGeneratingTag(false);
     }
+  };
+
+  // 换一换：重新生成心情元数据
+  const handleRegenerateMood = async (mood: MoodOption) => {
+    setIsRegenerating(true);
+    try {
+      const metadata = await generateMoodMetadata(mood.label);
+      const updatedMood: MoodOption = {
+        ...mood,
+        emoji: metadata.emoji || mood.emoji,
+        color: metadata.color || mood.color,
+        hexColor: metadata.hexColor || mood.hexColor || getHexFromTailwind(mood.color),
+        score: metadata.score !== undefined ? metadata.score : mood.score
+      };
+
+      // 更新自定义心情或默认心情
+      if (customMoods.some(m => m.label === mood.label)) {
+        await databaseService.saveCustomMood(updatedMood);
+        const updated = customMoods.map(m => m.label === mood.label ? updatedMood : m);
+        setCustomMoods(updated);
+      }
+
+      setSelectedMood(updatedMood);
+    } catch (error) {
+      console.error("Error regenerating mood", error);
+    } finally {
+      setIsRegenerating(false);
+    }
+  };
+
+  // 更新心情的颜色
+  const handleUpdateMoodColor = async (mood: MoodOption, hexColor: string) => {
+    const updatedMood: MoodOption = {
+      ...mood,
+      hexColor: hexColor
+    };
+
+    // 更新自定义心情
+    if (customMoods.some(m => m.label === mood.label)) {
+      await databaseService.saveCustomMood(updatedMood);
+      const updated = customMoods.map(m => m.label === mood.label ? updatedMood : m);
+      setCustomMoods(updated);
+    }
+
+    setSelectedMood(updatedMood);
+    setShowColorPicker(null);
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -203,24 +252,86 @@ const DiaryEntryForm: React.FC<Props> = ({ initialData, onSave, onClose }) => {
                         ? `bg-gray-800 border-gray-800 text-white shadow-lg shadow-gray-200 transform scale-105`
                         : 'bg-white border-white text-gray-500 hover:bg-white/80 shadow-sm'
                     }`}
+                    style={selectedMood.label === m.label && m.hexColor ? {
+                      backgroundColor: m.hexColor,
+                      borderColor: m.hexColor
+                    } : undefined}
                   >
                     <span className="text-base">{m.emoji}</span>
                     <span className="text-xs font-bold">{m.label}</span>
+                    {m.hexColor && (
+                      <span
+                        className="w-2.5 h-2.5 rounded-full border border-white/50"
+                        style={{ backgroundColor: m.hexColor }}
+                      />
+                    )}
                   </button>
-                  {/* 删除按钮 */}
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      deleteCustomMood(m.label);
-                    }}
-                    className="absolute -top-1 -right-1 w-4 h-4 bg-rose-500 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow-sm hover:bg-rose-600"
-                    title={`删除「${m.label}」`}
-                  >
-                    <svg className="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                  </button>
+                  {/* 操作按钮组 */}
+                  <div className="absolute -top-1 -right-1 flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                    {/* 换一换按钮 */}
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleRegenerateMood(m);
+                      }}
+                      disabled={isRegenerating}
+                      className="w-4 h-4 bg-indigo-500 text-white rounded-full flex items-center justify-center shadow-sm hover:bg-indigo-600 disabled:opacity-50"
+                      title="换一换"
+                    >
+                      <svg className="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                      </svg>
+                    </button>
+                    {/* 颜色选择按钮 */}
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setShowColorPicker(showColorPicker === m.label ? null : m.label);
+                      }}
+                      className="w-4 h-4 bg-amber-500 text-white rounded-full flex items-center justify-center shadow-sm hover:bg-amber-600"
+                      title="自定义颜色"
+                    >
+                      <span
+                        className="w-2.5 h-2.5 rounded-full border border-white"
+                        style={{ backgroundColor: m.hexColor || getHexFromTailwind(m.color) }}
+                      />
+                    </button>
+                    {/* 删除按钮 */}
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        deleteCustomMood(m.label);
+                      }}
+                      className="w-4 h-4 bg-rose-500 text-white rounded-full flex items-center justify-center shadow-sm hover:bg-rose-600"
+                      title={`删除「${m.label}」`}
+                    >
+                      <svg className="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  </div>
+                  {/* 颜色选择器弹出框 */}
+                  {showColorPicker === m.label && (
+                    <div className="absolute top-full left-0 mt-2 p-2 bg-white rounded-xl shadow-lg border border-gray-100 z-20 animate-in fade-in">
+                      <div className="grid grid-cols-6 gap-1.5">
+                        {MOOD_COLOR_PALETTE.map((color) => (
+                          <button
+                            key={color.hex}
+                            type="button"
+                            onClick={() => handleUpdateMoodColor(m, color.hex)}
+                            className={`w-6 h-6 rounded-full transition-transform hover:scale-110 ${
+                              m.hexColor === color.hex ? 'ring-2 ring-offset-1 ring-gray-400' : ''
+                            }`}
+                            style={{ backgroundColor: color.hex }}
+                            title={color.name}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               ))}
 
@@ -257,6 +368,7 @@ const DiaryEntryForm: React.FC<Props> = ({ initialData, onSave, onClose }) => {
               )}
             </div>
             {isGeneratingTag && <p className="text-xs text-center text-gray-400 animate-pulse">正在为您定制专属情绪色彩...</p>}
+            {isRegenerating && <p className="text-xs text-center text-indigo-400 animate-pulse">正在重新生成...</p>}
           </div>
 
           <div className="space-y-3">
