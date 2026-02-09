@@ -254,9 +254,10 @@ const EnergyBattery: React.FC<Props> = ({ entries, allEntries, customMoods = [] 
               {selectedBlock.score.toFixed(1)}分
             </span>
           </div>
-          <p className="text-xs text-gray-600 line-clamp-2">
-            {selectedBlock.content.replace(/<[^>]*>/g, '')}
-          </p>
+          <div
+            className="text-xs text-gray-600"
+            dangerouslySetInnerHTML={{ __html: selectedBlock.content }}
+          />
         </div>
       )}
 

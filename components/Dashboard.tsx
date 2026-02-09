@@ -723,9 +723,10 @@ const Dashboard: React.FC<Props> = ({ entries, onDataRestored }) => {
                                    {entry.moodScore.toFixed(0)}
                                  </div>
                               </div>
-                              <p className="text-sm text-gray-700 leading-relaxed">
-                                 {entry.content}
-                              </p>
+                              <div
+                                className="text-sm text-gray-700 leading-relaxed"
+                                dangerouslySetInnerHTML={{ __html: entry.content }}
+                              />
                            </div>
                         );
                      })}
