@@ -359,6 +359,20 @@ export interface WeeklyReport {
   suggestions: string[];
 }
 
+// 触发因素分析接口
+export interface TriggerFactor {
+  category: string;      // 事件类型（如：工作、社交、家庭）
+  count: number;         // 出现次数
+  avgScore: number;      // 平均情绪分数
+  trend: 'positive' | 'neutral' | 'negative';  // 情绪倾向
+}
+
+export interface TriggerAnalysis {
+  factors: TriggerFactor[];
+  insight: string;       // AI 洞察总结
+  timestamp: number;     // 分析时间戳（用于缓存判断）
+}
+
 // 生成 AI 情绪周报
 export const generateWeeklyReport = async (entries: DiaryEntry[]): Promise<WeeklyReport> => {
   if (entries.length === 0) {
@@ -503,6 +517,85 @@ export const generateWeeklyReport = async (entries: DiaryEntry[]): Promise<Weekl
       dailySummaries: [],
       negativePeaks: [],
       suggestions: []
+    };
+  }
+};
+
+// 分析情绪触发因素
+export const analyzeTriggerFactors = async (entries: DiaryEntry[]): Promise<TriggerAnalysis> => {
+  if (entries.length === 0) {
+    return {
+      factors: [],
+      insight: '暂无数据可分析',
+      timestamp: Date.now()
+    };
+  }
+
+  const entriesSummary = entries.map(e => ({
+    time: new Date(e.timestamp).toLocaleString('zh-CN'),
+    mood: e.mood,
+    score: e.moodScore,
+    content: e.content.substring(0, 100)
+  }));
+
+  const promptText = `
+    以下是用户过去一周的心情日记记录：
+    ${JSON.stringify(entriesSummary, null, 2)}
+
+    请分析这些日记内容，提取出影响用户情绪的事件类型/触发因素。
+
+    要求：
+    1. 从日记内容中识别出事件类型，例如：工作、社交、家庭、健康、学习、娱乐、感情、金钱、天气、独处等
+    2. 每个事件类型统计出现次数和关联的平均情绪分数
+    3. 根据平均分判断情绪倾向：≥7分为positive，4-6分为neutral，≤3分为negative
+    4. 只返回出现次数≥1的事件类型，最多返回8个
+    5. 按平均分从高到低排序
+    6. 生成一句20-40字的洞察总结，指出哪类事件对情绪影响最好/最差
+
+    返回 JSON 格式：
+    {
+      "factors": [
+        {
+          "category": "事件类型名称",
+          "count": 出现次数(数字),
+          "avgScore": 平均情绪分(数字，保留1位小数),
+          "trend": "positive" 或 "neutral" 或 "negative"
+        }
+      ],
+      "insight": "洞察总结，如：社交活动明显提升你的心情，而工作相关的事件容易导致情绪低落"
+    }
+
+    注意：
+    - category 要简洁（2-4个字），如"工作会议"、"家人相处"、"独处反思"
+    - 如果日记内容没有明确提到某类事件，不要强行归类
+    - avgScore 要根据关联日记的 moodScore 字段计算
+  `;
+
+  try {
+    let jsonString = "{}";
+
+    if (CURRENT_PROVIDER === 'DEEPSEEK') {
+      console.log("Using DeepSeek for Trigger Analysis...");
+      jsonString = await callDeepSeek(
+        "你是一位专业的心理数据分析师，擅长从日记内容中识别情绪触发因素。请只返回 JSON。",
+        promptText
+      );
+    } else {
+      throw new Error("Gemini provider not configured. Please use DEEPSEEK.");
+    }
+
+    const result = JSON.parse(cleanJsonString(jsonString));
+    return {
+      factors: result.factors || [],
+      insight: result.insight || '分析完成',
+      timestamp: Date.now()
+    };
+  } catch (error) {
+    console.error(`Trigger analysis failed (${CURRENT_PROVIDER}):`, error);
+    return {
+      factors: [],
+      insight: '分析失败，请稍后重试',
+      timestamp: Date.now()
     };
   }
 };

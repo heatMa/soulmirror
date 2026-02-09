@@ -4,6 +4,7 @@ import { MOOD_OPTIONS, MoodOption, getHexFromTailwind, ICONS } from '../constant
 import HeatmapChart from './HeatmapChart';
 import MoodHistory from './MoodHistory';
 import MoodHourlyDistribution from './MoodHourlyDistribution';
+import TriggerAnalysisChart from './TriggerAnalysisChart';
 import { generateWeeklyReport, WeeklyReport, DailySummary } from '../services/geminiService';
 
 interface Props {
@@ -342,6 +343,11 @@ const Statistics: React.FC<Props> = ({ entries, customMoods }) => {
       {/* 周报视图 */}
       {activeView === 'report' && (
         <div className="space-y-4">
+          {/* 情绪触发因素分析 - 放在周报最上方 */}
+          <TriggerAnalysisChart entries={entries.filter(e =>
+            e.timestamp >= Date.now() - 7 * 24 * 60 * 60 * 1000
+          )} />
+
           {!weeklyReport && !isLoadingReport && (
             <div className="glass-card rounded-[2rem] p-6 text-center">
               <div className="text-5xl mb-4">🤖</div>
