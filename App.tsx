@@ -187,18 +187,18 @@ const App: React.FC = () => {
                   })
                   .catch(console.error);
               }
-            }
-          })
-          .catch(console.error);
 
-        // AI 暖心回复
-        generateAiReply(newEntry.mood, newEntry.content)
-          .then(async (reply) => {
-            if (reply) {
-              await databaseService.updateEntryAiReply(newEntry.id, reply);
-              setEntries(currentEntries =>
-                currentEntries.map(e => e.id === newEntry.id ? { ...e, aiReply: reply } : e)
-              );
+              // AI 暖心回复（传入评分，评分≤5时会生成鸡汤）
+              generateAiReply(newEntry.mood, newEntry.content, aiScore)
+                .then(async (reply) => {
+                  if (reply) {
+                    await databaseService.updateEntryAiReply(newEntry.id, reply);
+                    setEntries(currentEntries =>
+                      currentEntries.map(e => e.id === newEntry.id ? { ...e, aiReply: reply } : e)
+                    );
+                  }
+                })
+                .catch(console.error);
             }
           })
           .catch(console.error);
