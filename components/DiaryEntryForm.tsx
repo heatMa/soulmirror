@@ -25,6 +25,7 @@ const TEXT_COLORS = [
 const DiaryEntryForm: React.FC<Props> = ({ initialData, onSave, onClose }) => {
   const [selectedMood, setSelectedMood] = useState<MoodOption>(MOOD_OPTIONS[2]);
   const [customMoods, setCustomMoods] = useState<MoodOption[]>([]);
+  const [builtinMoodOverrides, setBuiltinMoodOverrides] = useState<Record<string, Partial<MoodOption>>>({});
   const [newMoodInput, setNewMoodInput] = useState('');
   const [isAddingMood, setIsAddingMood] = useState(false);
   const [isGeneratingTag, setIsGeneratingTag] = useState(false);
@@ -32,6 +33,43 @@ const DiaryEntryForm: React.FC<Props> = ({ initialData, onSave, onClose }) => {
   const [showColorPicker, setShowColorPicker] = useState<string | null>(null); // 存储正在编辑颜色的心情 label
   const [activeColor, setActiveColor] = useState<string>('#374151');
   const contentRef = useRef<HTMLDivElement>(null);
+
+  // 获取合并了自定义配置的内置心情列表
+  const getMergedBuiltinMoods = (): MoodOption[] => {
+    return MOOD_OPTIONS.map(m => ({
+      ...m,
+      ...builtinMoodOverrides[m.label]
+    }));
+  };
+
+  // 加载内置心情的自定义配置
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem('soulmirror_builtin_mood_overrides');
+      if (stored) {
+        setBuiltinMoodOverrides(JSON.parse(stored));
+      }
+    } catch (e) {
+      console.error('Failed to load builtin mood overrides', e);
+    }
+  }, []);
+
+  // 保存内置心情的自定义配置
+  const saveBuiltinMoodOverride = (label: string, override: Partial<MoodOption>) => {
+    const updated = {
+      ...builtinMoodOverrides,
+      [label]: {
+        ...builtinMoodOverrides[label],
+        ...override
+      }
+    };
+    setBuiltinMoodOverrides(updated);
+    try {
+      localStorage.setItem('soulmirror_builtin_mood_overrides', JSON.stringify(updated));
+    } catch (e) {
+      console.error('Failed to save builtin mood overrides', e);
+    }
+  };
 
   // 初始化数据（如果是编辑模式）
   useEffect(() => {
@@ -131,16 +169,22 @@ const DiaryEntryForm: React.FC<Props> = ({ initialData, onSave, onClose }) => {
     setIsRegenerating(true);
     try {
       const metadata = await generateMoodMetadata(mood.label);
-      const updatedMood: MoodOption = {
-        ...mood,
+      const override = {
         emoji: metadata.emoji || mood.emoji,
-        color: metadata.color || mood.color,
         hexColor: metadata.hexColor || mood.hexColor || getHexFromTailwind(mood.color),
         score: metadata.score !== undefined ? metadata.score : mood.score
       };
 
-      // 更新自定义心情或默认心情
-      if (customMoods.some(m => m.label === mood.label)) {
+      const updatedMood: MoodOption = {
+        ...mood,
+        ...override
+      };
+
+      // 判断是内置心情还是自定义心情
+      const isBuiltin = MOOD_OPTIONS.some(m => m.label === mood.label);
+      if (isBuiltin) {
+        saveBuiltinMoodOverride(mood.label, override);
+      } else {
         await databaseService.saveCustomMood(updatedMood);
         const updated = customMoods.map(m => m.label === mood.label ? updatedMood : m);
         setCustomMoods(updated);
@@ -161,8 +205,11 @@ const DiaryEntryForm: React.FC<Props> = ({ initialData, onSave, onClose }) => {
       hexColor: hexColor
     };
 
-    // 更新自定义心情
-    if (customMoods.some(m => m.label === mood.label)) {
+    // 判断是内置心情还是自定义心情
+    const isBuiltin = MOOD_OPTIONS.some(m => m.label === mood.label);
+    if (isBuiltin) {
+      saveBuiltinMoodOverride(mood.label, { hexColor });
+    } else {
       await databaseService.saveCustomMood(updatedMood);
       const updated = customMoods.map(m => m.label === mood.label ? updatedMood : m);
       setCustomMoods(updated);
@@ -226,20 +273,83 @@ const DiaryEntryForm: React.FC<Props> = ({ initialData, onSave, onClose }) => {
           
           <div className="space-y-3">
             <div className="flex flex-wrap gap-2">
-              {MOOD_OPTIONS.map((m) => (
-                <button
-                  key={m.value}
-                  type="button"
-                  onClick={() => setSelectedMood(m)}
-                  className={`px-2.5 py-1.5 rounded-xl flex items-center gap-1.5 transition-all duration-300 border ${
-                    selectedMood.label === m.label
-                      ? `bg-gray-800 border-gray-800 text-white shadow-lg shadow-gray-200 transform scale-105`
-                      : 'bg-white border-white text-gray-500 hover:bg-white/80 shadow-sm'
-                  }`}
-                >
-                  <span className="text-base">{m.emoji}</span>
-                  <span className="text-xs font-bold">{m.label}</span>
-                </button>
+              {getMergedBuiltinMoods().map((m) => (
+                <div key={m.value} className="relative group">
+                  <button
+                    type="button"
+                    onClick={() => setSelectedMood(m)}
+                    className={`px-2.5 py-1.5 rounded-xl flex items-center gap-1.5 transition-all duration-300 border ${
+                      selectedMood.label === m.label
+                        ? `text-white shadow-lg shadow-gray-200 transform scale-105`
+                        : 'bg-white border-white text-gray-500 hover:bg-white/80 shadow-sm'
+                    }`}
+                    style={selectedMood.label === m.label && m.hexColor ? {
+                      backgroundColor: m.hexColor,
+                      borderColor: m.hexColor
+                    } : undefined}
+                  >
+                    <span className="text-base">{m.emoji}</span>
+                    <span className="text-xs font-bold">{m.label}</span>
+                    {m.hexColor && (
+                      <span
+                        className="w-2.5 h-2.5 rounded-full border border-white/50"
+                        style={{ backgroundColor: m.hexColor }}
+                      />
+                    )}
+                  </button>
+                  {/* 操作按钮组 */}
+                  <div className="absolute -top-1 -right-1 flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                    {/* 换一换按钮 */}
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleRegenerateMood(m);
+                      }}
+                      disabled={isRegenerating}
+                      className="w-4 h-4 bg-indigo-500 text-white rounded-full flex items-center justify-center shadow-sm hover:bg-indigo-600 disabled:opacity-50"
+                      title="换一换"
+                    >
+                      <svg className="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                      </svg>
+                    </button>
+                    {/* 颜色选择按钮 */}
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setShowColorPicker(showColorPicker === m.label ? null : m.label);
+                      }}
+                      className="w-4 h-4 bg-amber-500 text-white rounded-full flex items-center justify-center shadow-sm hover:bg-amber-600"
+                      title="自定义颜色"
+                    >
+                      <span
+                        className="w-2.5 h-2.5 rounded-full border border-white"
+                        style={{ backgroundColor: m.hexColor || getHexFromTailwind(m.color) }}
+                      />
+                    </button>
+                  </div>
+                  {/* 颜色选择器弹出框 */}
+                  {showColorPicker === m.label && (
+                    <div className="absolute top-full left-0 mt-2 p-2 bg-white rounded-xl shadow-lg border border-gray-100 z-20 animate-in fade-in">
+                      <div className="grid grid-cols-6 gap-1.5">
+                        {MOOD_COLOR_PALETTE.map((color) => (
+                          <button
+                            key={color.hex}
+                            type="button"
+                            onClick={() => handleUpdateMoodColor(m, color.hex)}
+                            className={`w-6 h-6 rounded-full transition-transform hover:scale-110 ${
+                              m.hexColor === color.hex ? 'ring-2 ring-offset-1 ring-gray-400' : ''
+                            }`}
+                            style={{ backgroundColor: color.hex }}
+                            title={color.name}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
               ))}
 
               {customMoods.map((m) => (
