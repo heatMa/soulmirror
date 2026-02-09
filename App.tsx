@@ -99,6 +99,7 @@ const App: React.FC = () => {
           mood: formData.mood,
           moodScore: formData.moodScore,
           moodEmoji: formData.moodEmoji,
+          moodHexColor: formData.moodHexColor,
           tags: formData.tags
         };
 
@@ -159,6 +160,7 @@ const App: React.FC = () => {
           mood: formData.mood,
           moodScore: formData.moodScore,
           moodEmoji: formData.moodEmoji,
+          moodHexColor: formData.moodHexColor,
           tags: formData.tags
         };
 
@@ -248,16 +250,27 @@ const App: React.FC = () => {
   const getMoodConfig = (moodLabel: string, entry?: DiaryEntry): MoodOption => {
     const found = MOOD_OPTIONS.find(m => m.label === moodLabel) ||
                   customMoods.find(m => m.label === moodLabel);
-    if (found) return found;
 
-    // 找不到配置时，使用 entry 自带的 emoji（如果有）
+    if (found) {
+      // 如果 entry 中有保存的颜色/emoji，优先使用（因为用户可能自定义过）
+      if (entry?.moodHexColor || entry?.moodEmoji) {
+        return {
+          ...found,
+          hexColor: entry.moodHexColor || found.hexColor,
+          emoji: entry.moodEmoji || found.emoji
+        };
+      }
+      return found;
+    }
+
+    // 找不到配置时，使用 entry 自带的数据（emoji 和 hexColor）
     return {
       label: moodLabel,
       value: moodLabel,
       score: entry?.moodScore || 5,
       emoji: entry?.moodEmoji || '🏷️',
       color: 'bg-gray-400',
-      hexColor: '#9ca3af',
+      hexColor: entry?.moodHexColor || '#9ca3af',
       shadow: 'shadow-gray-200',
       suggestions: []
     };
@@ -272,6 +285,56 @@ const App: React.FC = () => {
              entryDate.getFullYear() === selectedDate.getFullYear();
     })
     .sort((a, b) => b.timestamp - a.timestamp);
+
+  // 计算每条记录的频次统计（今天、本周、本月）
+  const getEntryCounts = (entry: DiaryEntry) => {
+    const entryDate = new Date(entry.timestamp);
+
+    // 今天的记录（按时间升序统计到当前记录为止）
+    const todayEntries = entries
+      .filter(e => {
+        const eDate = new Date(e.timestamp);
+        return eDate.getDate() === entryDate.getDate() &&
+               eDate.getMonth() === entryDate.getMonth() &&
+               eDate.getFullYear() === entryDate.getFullYear() &&
+               e.timestamp <= entry.timestamp;
+      })
+      .sort((a, b) => a.timestamp - b.timestamp);
+    const countToday = todayEntries.findIndex(e => e.id === entry.id) + 1;
+
+    // 本周的记录（周一到周日）
+    const getWeekStart = (date: Date) => {
+      const d = new Date(date);
+      const day = d.getDay();
+      const diff = d.getDate() - day + (day === 0 ? -6 : 1); // 调整到周一
+      return new Date(d.setDate(diff));
+    };
+    const weekStart = getWeekStart(entryDate);
+    weekStart.setHours(0, 0, 0, 0);
+    const weekEnd = new Date(weekStart);
+    weekEnd.setDate(weekEnd.getDate() + 7);
+
+    const weekEntries = entries
+      .filter(e => {
+        const eDate = new Date(e.timestamp);
+        return eDate >= weekStart && eDate < weekEnd && e.timestamp <= entry.timestamp;
+      })
+      .sort((a, b) => a.timestamp - b.timestamp);
+    const countWeek = weekEntries.findIndex(e => e.id === entry.id) + 1;
+
+    // 本月的记录
+    const monthEntries = entries
+      .filter(e => {
+        const eDate = new Date(e.timestamp);
+        return eDate.getMonth() === entryDate.getMonth() &&
+               eDate.getFullYear() === entryDate.getFullYear() &&
+               e.timestamp <= entry.timestamp;
+      })
+      .sort((a, b) => a.timestamp - b.timestamp);
+    const countMonth = monthEntries.findIndex(e => e.id === entry.id) + 1;
+
+    return { countToday, countWeek, countMonth };
+  };
 
   const getSelectedDateStr = () => {
     return selectedDate.toLocaleDateString('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit' }).replace(/\//g, '-');
@@ -397,7 +460,8 @@ const App: React.FC = () => {
                 {timelineEntries.map((entry, index) => {
                   const moodConfig = getMoodConfig(entry.mood, entry);
                   const isLast = index === timelineEntries.length - 1;
-                  
+                  const { countToday, countWeek, countMonth } = getEntryCounts(entry);
+
                   return (
                     <TimelineItem
                         key={entry.id}
@@ -406,6 +470,9 @@ const App: React.FC = () => {
                         isLast={isLast}
                         onEdit={openEditModal}
                         onDelete={deleteEntry}
+                        countToday={countToday}
+                        countWeek={countWeek}
+                        countMonth={countMonth}
                     />
                   );
                 })}

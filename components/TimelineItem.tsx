@@ -9,9 +9,12 @@ interface Props {
   isLast: boolean;
   onEdit: (entry: DiaryEntry) => void;
   onDelete: (entry: DiaryEntry) => void;
+  countToday: number;
+  countWeek: number;
+  countMonth: number;
 }
 
-const TimelineItem: React.FC<Props> = ({ entry, moodConfig, isLast, onEdit, onDelete }) => {
+const TimelineItem: React.FC<Props> = ({ entry, moodConfig, isLast, onEdit, onDelete, countToday, countWeek, countMonth }) => {
   const [isCollapsed, setIsCollapsed] = useState(false); // 完全折叠状态
   const [swipeOffset, setSwipeOffset] = useState(0);
   const [showDeleteBtn, setShowDeleteBtn] = useState(false);
@@ -189,6 +192,10 @@ const TimelineItem: React.FC<Props> = ({ entry, moodConfig, isLast, onEdit, onDe
                    style={{ color: moodHexColor }}
                  >
                    {entry.mood}
+                 </span>
+                 {/* 频次统计 */}
+                 <span className="text-[11px] font-medium text-gray-400 tracking-tight">
+                   今{countToday}・周{countWeek}・月{countMonth}
                  </span>
                  <div className="flex items-baseline gap-2">
                      <span className="text-sm font-medium text-gray-400 font-mono tracking-tight">
