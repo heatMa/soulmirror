@@ -5,6 +5,9 @@ import { DiaryEntry, AIAnalysis, BackupData, ImportResult } from '../types';
 import { analyzeMoods } from '../services/geminiService';
 import { databaseService } from '../services/databaseService';
 import { ICONS, MOOD_OPTIONS, MoodOption } from '../constants';
+import { Capacitor } from '@capacitor/core';
+import { Filesystem, Directory } from '@capacitor/filesystem';
+import { Share } from '@capacitor/share';
 
 interface Props {
   entries: DiaryEntry[];
@@ -218,18 +221,49 @@ const Dashboard: React.FC<Props> = ({ entries, onDataRestored }) => {
     try {
       const backupData = await databaseService.exportAllData();
       const jsonStr = JSON.stringify(backupData, null, 2);
-      const blob = new Blob([jsonStr], { type: 'application/json;charset=utf-8' });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
       const date = new Date().toISOString().split('T')[0];
       const filename = `soulmirror_backup_${date}.json`;
-      link.download = filename;
-      link.click();
-      URL.revokeObjectURL(url);
 
-      // 提示用户备份完成
-      alert(`备份完成！\n\n文件名: ${filename}\n保存位置: 下载文件夹 (Downloads)\n\n请妥善保管此文件，恢复数据时需要使用。`);
+      // 判断是否在原生平台上
+      const isNative = Capacitor.isNativePlatform();
+
+      if (isNative) {
+        // Android/iOS 平台 - 使用 Filesystem API
+        try {
+          const result = await Filesystem.writeFile({
+            path: filename,
+            data: jsonStr,
+            directory: Directory.Documents,
+            encoding: 'utf8'
+          });
+
+          console.log('文件保存成功:', result.uri);
+
+          // 使用 Share API 让用户选择保存位置或分享
+          await Share.share({
+            title: '保存备份文件',
+            text: '请选择保存位置',
+            url: result.uri,
+            dialogTitle: '保存 SoulMirror 备份'
+          });
+
+          alert(`备份完成！\n\n文件名: ${filename}\n\n请在分享菜单中选择"保存到文件"或其他存储位置。\n妥善保管此文件，恢复数据时需要使用。`);
+        } catch (nativeError) {
+          console.error('原生平台备份失败:', nativeError);
+          alert('备份失败，请检查应用权限设置');
+        }
+      } else {
+        // Web 平台 - 使用传统下载方式
+        const blob = new Blob([jsonStr], { type: 'application/json;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = filename;
+        link.click();
+        URL.revokeObjectURL(url);
+
+        alert(`备份完成！\n\n文件名: ${filename}\n保存位置: 下载文件夹 (Downloads)\n\n请妥善保管此文件，恢复数据时需要使用。`);
+      }
     } catch (err) {
       alert('备份失败，请重试');
       console.error('备份失败:', err);
