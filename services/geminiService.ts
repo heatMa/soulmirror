@@ -296,12 +296,16 @@ export const generateRegulationSuggestions = async (
 };
 
 // 生成 AI 暖心回复
-export const generateAiReply = async (mood: string, content: string): Promise<string> => {
+export const generateAiReply = async (mood: string, content: string, moodScore?: number): Promise<string> => {
+  // 判断是否需要鸡汤（评分 ≤ 5）
+  const needsEncouragement = moodScore !== undefined && moodScore <= 5;
+
   const promptText = `
     用户刚刚写了一篇心情日记：
 
     心情标签: ${mood}
     日记内容: ${content}
+    ${moodScore !== undefined ? `情绪评分: ${moodScore}分（满分10分）` : ''}
 
     请用一句温暖、真诚的话回应用户。要求：
     1. 简短有力，不超过30个字
@@ -312,8 +316,15 @@ export const generateAiReply = async (mood: string, content: string): Promise<st
        - 平静时：肯定当下的状态
     4. 可以适当使用 emoji，但不要超过1个
     5. 不要用"亲"、"宝"等过于亲昵的称呼
+    ${needsEncouragement ? `
+    6. 【重要】用户情绪低落（评分≤5），请在回复最后另起一行，加上一句简短有力的鸡汤金句：
+       - 要与日记内容相关，针对用户的具体困境
+       - 15-25个字，有力量感，能给人希望
+       - 用「」符号包裹，如：「黑夜之后，总有黎明」
+       - 避免老套的鸡汤，要有新意和洞察
+    ` : ''}
 
-    返回 JSON 格式: { "reply": "你的回复" }
+    返回 JSON 格式: { "reply": "你的回复${needsEncouragement ? '\\n\\n「鸡汤金句」' : ''}" }
   `;
 
   try {

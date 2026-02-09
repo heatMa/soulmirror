@@ -81,6 +81,30 @@ The app has two views controlled by `ViewMode` enum:
 - `TIMELINE` - Calendar + daily entries + mood chart
 - `ANALYSIS` - AI-powered Dashboard with insights
 
+## Deployment
+
+### Web (Cloudflare Pages)
+
+项目通过 Wrangler CLI 手动部署到 Cloudflare Pages：
+
+```bash
+# 构建并部署到生产环境（主域名 soulmirror.pages.dev）
+npm run build && npx wrangler pages deploy dist --project-name soulmirror --branch main
+```
+
+- **线上地址**: https://soulmirror.pages.dev
+- **部署方式**: 手动部署（非 Git 集成）
+- **重要**: 必须加 `--branch main` 才能更新主域名，否则只会部署到预览环境
+
+### Android
+
+```bash
+# 构建并同步到 Android
+npm run build && npx cap sync android
+
+# 然后用 Android Studio 打开 android 目录进行打包
+```
+
 ## Environment Configuration
 
 Set `GEMINI_API_KEY` in `.env.local` if using Gemini provider. DeepSeek API key is hardcoded in `geminiService.ts`.
