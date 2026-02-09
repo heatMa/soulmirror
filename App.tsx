@@ -6,6 +6,7 @@ import Dashboard from './components/Dashboard';
 import CalendarStrip from './components/CalendarStrip';
 import DailyMoodChart from './components/DailyMoodChart';
 import EnergyBattery from './components/EnergyBattery';
+import WeeklyGoal from './components/WeeklyGoal';
 import TimelineItem from './components/TimelineItem';
 import Statistics from './components/Statistics';
 import { ICONS, MOOD_OPTIONS, MoodOption } from './constants';
@@ -374,6 +375,11 @@ const App: React.FC = () => {
                  <DailyMoodChart entries={timelineEntries} customMoods={customMoods} />
               </div>
             )}
+
+            {/* Weekly Goal */}
+            <div className="mb-4 animate-in fade-in slide-in-from-bottom-5 duration-700">
+               <WeeklyGoal entries={entries} />
+            </div>
 
             {/* Energy Battery */}
             <div className="mb-6 animate-in fade-in slide-in-from-bottom-6 duration-700">
