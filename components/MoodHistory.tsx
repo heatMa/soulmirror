@@ -6,9 +6,10 @@ interface Props {
   entries: DiaryEntry[];
   allMoods: MoodOption[];
   selectedMood: string | null;
+  timeRange: 'week' | 'month' | 'all';
 }
 
-const MoodHistory: React.FC<Props> = ({ entries, allMoods, selectedMood }) => {
+const MoodHistory: React.FC<Props> = ({ entries, allMoods, selectedMood, timeRange }) => {
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
 
   // 按日期分组条目
@@ -33,7 +34,29 @@ const MoodHistory: React.FC<Props> = ({ entries, allMoods, selectedMood }) => {
     return new Set(Object.keys(entriesByDate));
   }, [entriesByDate]);
 
-  // 生成日历数据 (近3个月)
+  // 根据时间范围决定显示多少个月
+  const monthsToShow = useMemo(() => {
+    switch (timeRange) {
+      case 'week':
+        return 1;  // 近7天只显示当月
+      case 'month':
+        return 2;  // 近30天显示2个月
+      case 'all':
+      default:
+        return 3;  // 全部显示3个月
+    }
+  }, [timeRange]);
+
+  // 计算最大次数用于透明度计算
+  const maxCount = useMemo(() => {
+    let max = 0;
+    Object.values(entriesByDate).forEach(dayEntries => {
+      if (dayEntries.length > max) max = dayEntries.length;
+    });
+    return max || 1;
+  }, [entriesByDate]);
+
+  // 生成日历数据 (根据时间范围动态调整)
   const calendarData = useMemo(() => {
     const months: {
       year: number;
@@ -43,7 +66,7 @@ const MoodHistory: React.FC<Props> = ({ entries, allMoods, selectedMood }) => {
 
     const today = new Date();
 
-    for (let i = 0; i < 3; i++) {
+    for (let i = 0; i < monthsToShow; i++) {
       const targetDate = new Date(today.getFullYear(), today.getMonth() - i, 1);
       const year = targetDate.getFullYear();
       const month = targetDate.getMonth();
@@ -80,7 +103,7 @@ const MoodHistory: React.FC<Props> = ({ entries, allMoods, selectedMood }) => {
     }
 
     return months;
-  }, [datesWithEntries, entriesByDate]);
+  }, [datesWithEntries, entriesByDate, monthsToShow]);
 
   // 当前选中日期的条目
   const selectedDateEntries = useMemo(() => {
@@ -161,6 +184,9 @@ const MoodHistory: React.FC<Props> = ({ entries, allMoods, selectedMood }) => {
                   }
                 }
 
+                // 根据次数计算不透明度 (最小0.3，最大1)
+                const opacity = hasEntries ? Math.max(0.3, dayData.count / maxCount) : 1;
+
                 return (
                   <button
                     key={dayData.dateStr}
@@ -178,7 +204,8 @@ const MoodHistory: React.FC<Props> = ({ entries, allMoods, selectedMood }) => {
                     }`}
                     style={{
                       backgroundColor: hasEntries ? dominantColor : '#f8fafc',
-                      color: hasEntries ? 'white' : (isToday ? '#374151' : '#9ca3af')
+                      color: hasEntries ? 'white' : (isToday ? '#374151' : '#9ca3af'),
+                      opacity: hasEntries ? opacity : 1
                     }}
                   >
                     {dayData.date.getDate()}

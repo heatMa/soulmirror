@@ -327,6 +327,7 @@ const Statistics: React.FC<Props> = ({ entries, customMoods }) => {
             entries={filteredEntries}
             allMoods={allMoods}
             selectedMood={selectedMoodFilter}
+            timeRange={selectedTimeRange}
           />
         </div>
       )}
