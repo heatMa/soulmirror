@@ -84,11 +84,11 @@ const HeatmapChart: React.FC<Props> = ({ entries, allMoods }) => {
         {/* 小时标签行 */}
         <div className="flex mb-1">
           <div className="w-8 flex-shrink-0" /> {/* 占位 */}
-          <div className="flex-1 flex">
+          <div className="flex-1 grid gap-[1px]" style={{ gridTemplateColumns: 'repeat(24, 1fr)' }}>
             {Array(24).fill(0).map((_, hour) => (
               <div
                 key={hour}
-                className="flex-1 text-center text-[9px] text-gray-400"
+                className="text-center text-[9px] text-gray-400"
               >
                 {hourLabels.includes(hour) ? `${hour}` : ''}
               </div>
@@ -105,7 +105,7 @@ const HeatmapChart: React.FC<Props> = ({ entries, allMoods }) => {
             </div>
 
             {/* 24小时格子 */}
-            <div className="flex-1 flex gap-[1px]">
+            <div className="flex-1 grid gap-[1px]" style={{ gridTemplateColumns: 'repeat(24, 1fr)' }}>
               {heatmapData[weekdayIndex].map((cell, hour) => {
                 const opacity = cell.count > 0 ? Math.max(0.2, cell.count / maxCount) : 0;
                 const bgColor = cell.dominantColor || '#e5e7eb';
@@ -113,7 +113,7 @@ const HeatmapChart: React.FC<Props> = ({ entries, allMoods }) => {
                 return (
                   <div
                     key={hour}
-                    className="flex-1 aspect-square rounded-sm transition-all hover:scale-110 cursor-pointer group relative"
+                    className="aspect-square rounded-sm transition-all hover:scale-110 cursor-pointer group relative"
                     style={{
                       backgroundColor: cell.count > 0 ? bgColor : '#f1f5f9',
                       opacity: cell.count > 0 ? opacity : 1
