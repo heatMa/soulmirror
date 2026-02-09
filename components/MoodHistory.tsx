@@ -308,7 +308,7 @@ const MoodHistory: React.FC<Props> = ({ entries, allMoods, selectedMood, timeRan
                     <span className="text-xs text-gray-400">{dateTime}</span>
                   </div>
                   <div
-                    className="text-sm text-gray-600 line-clamp-2"
+                    className="text-sm text-gray-600"
                     dangerouslySetInnerHTML={{ __html: entry.content }}
                   />
                 </div>

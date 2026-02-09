@@ -377,7 +377,7 @@ const App: React.FC = () => {
 
             {/* Energy Battery */}
             <div className="mb-6 animate-in fade-in slide-in-from-bottom-6 duration-700">
-               <EnergyBattery entries={timelineEntries} allEntries={entries} />
+               <EnergyBattery entries={timelineEntries} allEntries={entries} customMoods={customMoods} />
             </div>
             
             {timelineEntries.length === 0 ? (
