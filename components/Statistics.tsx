@@ -3,7 +3,7 @@ import { DiaryEntry } from '../types';
 import { MOOD_OPTIONS, MoodOption, getHexFromTailwind, ICONS } from '../constants';
 import HeatmapChart from './HeatmapChart';
 import MoodHistory from './MoodHistory';
-import { generateWeeklyReport, WeeklyReport } from '../services/geminiService';
+import { generateWeeklyReport, WeeklyReport, DailySummary } from '../services/geminiService';
 
 interface Props {
   entries: DiaryEntry[];
@@ -370,6 +370,26 @@ const Statistics: React.FC<Props> = ({ entries, customMoods }) => {
                 </div>
                 <p className="text-sm text-gray-600 leading-relaxed">{weeklyReport.summary}</p>
               </div>
+
+              {/* 每日一词总结 */}
+              {weeklyReport.dailySummaries && weeklyReport.dailySummaries.length > 0 && (
+                <div className="glass-card rounded-[2rem] p-4">
+                  <h3 className="text-sm font-bold text-gray-700 mb-3">📝 每日一词</h3>
+                  <div className="space-y-2">
+                    {weeklyReport.dailySummaries.map((day, index) => (
+                      <div
+                        key={index}
+                        className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl"
+                      >
+                        <span className="text-xl">{day.emoji}</span>
+                        <span className="text-base font-bold text-gray-700 min-w-[60px]">{day.keyword}</span>
+                        <span className="text-xs text-gray-400 flex-1">{day.date}</span>
+                        <span className="text-xs text-gray-400 font-mono">{day.avgScore.toFixed(1)}分</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               {/* 负面情绪高发时段 */}
               {weeklyReport.negativePeaks && weeklyReport.negativePeaks.length > 0 && (

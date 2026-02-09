@@ -336,11 +336,20 @@ export const generateAiReply = async (mood: string, content: string): Promise<st
   }
 };
 
+// 每日总结接口
+export interface DailySummary {
+  date: string;        // 日期 如 "2月9日"
+  keyword: string;     // 一个字或词 如 "忙"、"充实"
+  emoji: string;       // 代表这天的 emoji
+  avgScore: number;    // 平均分
+}
+
 // 周报接口
 export interface WeeklyReport {
   period: string;
   overallEmoji: string;
   summary: string;
+  dailySummaries: DailySummary[];  // 每日总结
   negativePeaks: {
     period: string;
     frequency: number;
@@ -356,10 +365,30 @@ export const generateWeeklyReport = async (entries: DiaryEntry[]): Promise<Weekl
       period: '过去一周',
       overallEmoji: '📭',
       summary: '这周还没有记录，开始记录你的心情吧！',
+      dailySummaries: [],
       negativePeaks: [],
       suggestions: ['每天花几分钟记录心情，帮助你更好地了解自己']
     };
   }
+
+  // 按日期分组
+  const entriesByDate: Record<string, DiaryEntry[]> = {};
+  entries.forEach(entry => {
+    const date = new Date(entry.timestamp);
+    const dateKey = `${date.getMonth() + 1}月${date.getDate()}日`;
+    if (!entriesByDate[dateKey]) {
+      entriesByDate[dateKey] = [];
+    }
+    entriesByDate[dateKey].push(entry);
+  });
+
+  // 按日期统计平均分和主要情绪
+  const dailyStats = Object.entries(entriesByDate).map(([date, dayEntries]) => {
+    const avgScore = dayEntries.reduce((sum, e) => sum + e.moodScore, 0) / dayEntries.length;
+    const moods = dayEntries.map(e => e.mood).join('、');
+    const contents = dayEntries.map(e => e.content.substring(0, 30)).join('；');
+    return { date, avgScore: avgScore.toFixed(1), moods, contents, count: dayEntries.length };
+  });
 
   // 按时间段分析数据
   const timeAnalysis: Record<string, { count: number; negativeMoods: string[]; scores: number[] }> = {};
@@ -400,12 +429,15 @@ export const generateWeeklyReport = async (entries: DiaryEntry[]): Promise<Weekl
     时间段分析：
     ${JSON.stringify(timeAnalysis, null, 2)}
 
+    按日期统计：
+    ${JSON.stringify(dailyStats, null, 2)}
+
     详细记录（部分）：
     ${JSON.stringify(entriesSummary.slice(0, 15), null, 2)}
 
     请分析用户的情绪周报，重点关注：
-    1. 负面情绪（评分≤5）在哪些时间段更容易出现？
-    2. 这些时间段出现负面情绪的可能原因是什么？
+    1. 为每一天生成一个字或词（不超过3个字）+ 一个 emoji 来总结这天的状态
+    2. 负面情绪（评分≤5）在哪些时间段更容易出现？
     3. 针对这些高发时段给出具体可执行的建议
 
     返回 JSON 格式：
@@ -413,6 +445,14 @@ export const generateWeeklyReport = async (entries: DiaryEntry[]): Promise<Weekl
       "period": "分析的时间范围，如 2月1日-2月7日",
       "overallEmoji": "最能代表这周情绪的 emoji",
       "summary": "50字以内的整体情绪概括",
+      "dailySummaries": [
+        {
+          "date": "日期，如 2月9日",
+          "keyword": "一个字或词（1-3个字），如：忙、充实、静、破茧、小确幸",
+          "emoji": "最能代表这天的 emoji",
+          "avgScore": 平均分（数字）
+        }
+      ],
       "negativePeaks": [
         {
           "period": "时间段名称",
@@ -424,6 +464,8 @@ export const generateWeeklyReport = async (entries: DiaryEntry[]): Promise<Weekl
     }
 
     要求：
+    - dailySummaries 必须包含所有有记录的日期，按日期从新到旧排序
+    - keyword 要有神韵、有洞察力，不要只是简单复述心情标签
     - negativePeaks 只列出负面情绪出现次数≥2的时间段，按频率从高到低排序
     - suggestions 要具体、可执行，与高发时段相关联
     - 语气温和鼓励，不要说教
@@ -447,6 +489,7 @@ export const generateWeeklyReport = async (entries: DiaryEntry[]): Promise<Weekl
       period: result.period || '过去一周',
       overallEmoji: result.overallEmoji || '📊',
       summary: result.summary || '这周的情绪数据已收集完成',
+      dailySummaries: result.dailySummaries || [],
       negativePeaks: result.negativePeaks || [],
       suggestions: result.suggestions || []
     };
@@ -456,6 +499,7 @@ export const generateWeeklyReport = async (entries: DiaryEntry[]): Promise<Weekl
       period: '过去一周',
       overallEmoji: '❌',
       summary: '周报生成失败，请稍后重试',
+      dailySummaries: [],
       negativePeaks: [],
       suggestions: []
     };

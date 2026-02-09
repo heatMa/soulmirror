@@ -138,19 +138,22 @@ const HeatmapChart: React.FC<Props> = ({ entries, allMoods }) => {
           </div>
         ))}
 
-        {/* 图例 */}
-        <div className="flex items-center justify-end gap-2 mt-3 text-[10px] text-gray-400">
-          <span>少</span>
-          <div className="flex gap-0.5">
-            {[0.2, 0.4, 0.6, 0.8, 1].map((opacity) => (
-              <div
-                key={opacity}
-                className="w-3 h-3 rounded-sm"
-                style={{ backgroundColor: '#6366f1', opacity }}
-              />
-            ))}
+        {/* 图例说明 */}
+        <div className="flex items-center justify-between mt-3 text-[10px] text-gray-400">
+          <span>颜色 = 心情主题色</span>
+          <div className="flex items-center gap-2">
+            <span>透明度：少</span>
+            <div className="flex gap-0.5">
+              {[0.2, 0.4, 0.6, 0.8, 1].map((opacity) => (
+                <div
+                  key={opacity}
+                  className="w-3 h-3 rounded-sm bg-gray-500"
+                  style={{ opacity }}
+                />
+              ))}
+            </div>
+            <span>多</span>
           </div>
-          <span>多</span>
         </div>
       </div>
     </div>

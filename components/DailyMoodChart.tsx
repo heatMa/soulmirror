@@ -132,6 +132,11 @@ const DailyMoodChart: React.FC<Props> = ({ entries, customMoods = [] }) => {
   // 获取当前小时用于显示参考线
   const currentHour = new Date().getHours() + new Date().getMinutes() / 60;
 
+  // 计算当天情绪分数的平均值
+  const averageScore = entryPoints.length > 0
+    ? entryPoints.reduce((sum, point) => sum + (point.score || 0), 0) / entryPoints.length
+    : 0;
+
   // 生成横轴刻度
   const generateTicks = () => {
     const { startHour, endHour } = timeRange;
@@ -255,6 +260,20 @@ const DailyMoodChart: React.FC<Props> = ({ entries, customMoods = [] }) => {
               ticks={[0, 5, 10]}
             />
             <ReferenceLine x={currentHour} stroke="#e5e7eb" strokeDasharray="3 3" />
+            {/* 平均分虚线 */}
+            <ReferenceLine
+              y={averageScore}
+              stroke="#f43f5e"
+              strokeDasharray="6 4"
+              strokeWidth={1.5}
+              label={{
+                value: `平均 ${averageScore.toFixed(1)}`,
+                position: 'right',
+                fontSize: 9,
+                fill: '#f43f5e',
+                fontWeight: 'bold'
+              }}
+            />
             <Tooltip
                 content={<CustomTooltip />}
                 cursor={{ stroke: '#4f46e5', strokeWidth: 1, strokeDasharray: '4 4' }}
