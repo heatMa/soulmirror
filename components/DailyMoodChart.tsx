@@ -205,8 +205,8 @@ const DailyMoodChart: React.FC<Props> = ({ entries, customMoods = [] }) => {
               onChange={(e) => setTempEndHour(Number(e.target.value))}
               className="px-2 py-1 text-xs border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-100"
             >
-              {Array.from({ length: 24 }, (_, i) => (
-                <option key={i} value={i}>{i.toString().padStart(2, '0')}:00</option>
+              {Array.from({ length: 25 }, (_, i) => (
+                <option key={i} value={i}>{i === 24 ? '24:00' : `${i.toString().padStart(2, '0')}:00`}</option>
               ))}
             </select>
           </div>
@@ -245,7 +245,7 @@ const DailyMoodChart: React.FC<Props> = ({ entries, customMoods = [] }) => {
               tickLine={false}
               tick={{fontSize: 9, fill: '#9ca3af'}}
               ticks={generateTicks()}
-              tickFormatter={(value) => `${value}:00`}
+              tickFormatter={(value) => `${Math.floor(value)}:00`}
             />
             <YAxis
               domain={[0, 10]}
