@@ -3,6 +3,7 @@ import { DiaryEntry } from '../types';
 import { MOOD_OPTIONS, MoodOption, getHexFromTailwind, ICONS } from '../constants';
 import HeatmapChart from './HeatmapChart';
 import MoodHistory from './MoodHistory';
+import MoodHourlyDistribution from './MoodHourlyDistribution';
 import { generateWeeklyReport, WeeklyReport, DailySummary } from '../services/geminiService';
 
 interface Props {
@@ -184,6 +185,12 @@ const Statistics: React.FC<Props> = ({ entries, customMoods }) => {
           <div className="glass-card rounded-[2rem] p-4">
             <h3 className="text-sm font-bold text-gray-600 mb-3 px-1">情绪热力图</h3>
             <HeatmapChart entries={filteredEntriesByTime} allMoods={allMoods} />
+          </div>
+
+          {/* 心情时段分布 */}
+          <div className="glass-card rounded-[2rem] p-4">
+            <h3 className="text-sm font-bold text-gray-600 mb-3 px-1">心情时段分布</h3>
+            <MoodHourlyDistribution entries={filteredEntriesByTime} allMoods={allMoods} />
           </div>
 
           {/* 时间段主题色 */}
