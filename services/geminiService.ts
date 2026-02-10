@@ -610,3 +610,69 @@ export const analyzeTriggerFactors = async (entries: DiaryEntry[]): Promise<Trig
     };
   }
 };
+
+// 生成本周叙事性总结
+export const generateWeeklySummary = async (entries: DiaryEntry[]): Promise<string> => {
+  if (entries.length === 0) {
+    throw new Error('本周记录过少');
+  }
+
+  const entriesSummary = entries.map(e => ({
+    time: new Date(e.timestamp).toLocaleString('zh-CN', { weekday: 'long', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' }),
+    mood: e.mood,
+    score: e.moodScore,
+    content: e.content
+  }));
+
+  const promptText = `
+    以下是用户本周的心情日记记录：
+    ${JSON.stringify(entriesSummary, null, 2)}
+
+    请为用户生成一篇温暖陪伴式的叙事性总结，标题为「本周你经历了...」
+
+    要求：
+    1. 长度：300-500字，4-5个段落
+    2. 语气：温暖陪伴式，像朋友一样关心用户，不要说教或分析
+    3. 结构：
+       - 第1段：开场，概括本周情绪的整体感受，用生动的比喻或意象
+       - 第2-3段：按时间线串联情绪变化，识别高潮、低谷、转折点
+         * 要结合具体的日记内容和情绪标签
+         * 用故事化的语言，而不是数据罗列
+         * 例如："周一的你还在xxx的阴影中，到了周三xxx让你重新振作..."
+       - 第4段：分析情绪起伏的内在联系，给予理解和共情
+       - 第5段：以温暖鼓励结尾，给予力量和希望
+    4. 禁止：
+       - 不要使用"你好"、"亲爱的"等称呼
+       - 不要出现"数据显示"、"根据记录"等冷冰冰的表达
+       - 不要空洞的鸡汤，要结合具体日记内容
+       - 不要使用emoji
+    5. 风格参考：
+       "这一周你像坐上了情绪过山车。周一的失落让你怀疑自己，但周三那个意外的好消息成了转折点。你开始发现，原来那些以为过不去的坎，也不过如此。到了周末，虽然还有些疲惫，但你已经能笑着回望这一周的起伏了。"
+
+    返回 JSON 格式：
+    {
+      "summary": "叙事性总结内容（300-500字，4-5段）"
+    }
+  `;
+
+  try {
+    let jsonString = "{}";
+
+    if (CURRENT_PROVIDER === 'DEEPSEEK') {
+      console.log("Using DeepSeek for Weekly Summary...");
+      jsonString = await callDeepSeek(
+        "你是一位温暖细腻的文字工作者，擅长用故事化的语言串联情绪变化，给人陪伴感和力量。请只返回 JSON。",
+        promptText
+      );
+    } else {
+      throw new Error("Gemini provider not configured. Please use DEEPSEEK.");
+    }
+
+    const result = JSON.parse(cleanJsonString(jsonString));
+    return result.summary || "本周的故事生成中...";
+  } catch (error) {
+    console.error(`Weekly summary generation failed (${CURRENT_PROVIDER}):`, error);
+    throw new Error("生成总结失败");
+  }
+};
+

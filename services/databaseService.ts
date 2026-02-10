@@ -1,6 +1,6 @@
 import { CapacitorSQLite, SQLiteConnection, SQLiteDBConnection } from '@capacitor-community/sqlite';
 import { Capacitor } from '@capacitor/core';
-import { DiaryEntry, BackupData, ImportResult } from '../types';
+import { DiaryEntry, BackupData, ImportResult, WeeklySummary } from '../types';
 import { MoodOption } from '../constants';
 
 // 数据库名称和版本
@@ -11,7 +11,8 @@ const DB_VERSION = 1;
 const STORAGE_KEYS = {
   ENTRIES: 'soulmirror_diary',
   NOTES: 'soulmirror_daily_notes',
-  CUSTOM_MOODS: 'soulmirror_custom_moods'
+  CUSTOM_MOODS: 'soulmirror_custom_moods',
+  WEEKLY_SUMMARIES: 'soulmirror_weekly_summaries'
 };
 
 // 数据库表创建 SQL
@@ -22,6 +23,7 @@ CREATE TABLE IF NOT EXISTS diary_entries (
   mood TEXT NOT NULL,
   mood_score REAL DEFAULT 0,
   mood_emoji TEXT,
+  mood_hex_color TEXT,
   content TEXT NOT NULL,
   tags TEXT DEFAULT '[]',
   ai_reply TEXT,
@@ -48,6 +50,12 @@ CREATE TABLE IF NOT EXISTS custom_moods (
 CREATE TABLE IF NOT EXISTS user_settings (
   key TEXT PRIMARY KEY,
   value TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS weekly_summaries (
+  week_key TEXT PRIMARY KEY,
+  content TEXT NOT NULL,
+  created_at INTEGER NOT NULL
 );
 
 CREATE INDEX IF NOT EXISTS idx_entries_timestamp ON diary_entries(timestamp);
@@ -117,16 +125,22 @@ class DatabaseService {
     if (!this.isNative || !this.db) return;
 
     try {
-      // 检查 mood_emoji 列是否存在，不存在则添加
+      // 检查 diary_entries 表的列是否存在，不存在则添加
       const tableInfo = await this.db.query("PRAGMA table_info(diary_entries)");
       const columns = tableInfo.values || [];
       const hasMoodEmoji = columns.some((col: any) => col.name === 'mood_emoji');
+      const hasMoodHexColor = columns.some((col: any) => col.name === 'mood_hex_color');
       const hasAiReply = columns.some((col: any) => col.name === 'ai_reply');
       const hasAiSuggestions = columns.some((col: any) => col.name === 'ai_suggestions');
 
       if (!hasMoodEmoji) {
         await this.db.execute('ALTER TABLE diary_entries ADD COLUMN mood_emoji TEXT');
         console.log('数据库迁移：添加 mood_emoji 列');
+      }
+
+      if (!hasMoodHexColor) {
+        await this.db.execute('ALTER TABLE diary_entries ADD COLUMN mood_hex_color TEXT');
+        console.log('数据库迁移：添加 mood_hex_color 列');
       }
 
       if (!hasAiReply) {
@@ -203,9 +217,9 @@ class DatabaseService {
 
     if (this.isNative && this.db) {
       await this.db.run(
-        `INSERT INTO diary_entries (id, timestamp, mood, mood_score, mood_emoji, content, tags)
-         VALUES (?, ?, ?, ?, ?, ?, ?)`,
-        [id, entry.timestamp, entry.mood, entry.moodScore, entry.moodEmoji || null, entry.content, JSON.stringify(entry.tags)]
+        `INSERT INTO diary_entries (id, timestamp, mood, mood_score, mood_emoji, mood_hex_color, content, tags)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        [id, entry.timestamp, entry.mood, entry.moodScore, entry.moodEmoji || null, entry.moodHexColor || null, entry.content, JSON.stringify(entry.tags)]
       );
     } else {
       const entries = await this.getAllEntries();
@@ -225,9 +239,9 @@ class DatabaseService {
     if (this.isNative && this.db) {
       await this.db.run(
         `UPDATE diary_entries
-         SET timestamp = ?, mood = ?, mood_score = ?, mood_emoji = ?, content = ?, tags = ?
+         SET timestamp = ?, mood = ?, mood_score = ?, mood_emoji = ?, mood_hex_color = ?, content = ?, tags = ?
          WHERE id = ?`,
-        [entry.timestamp, entry.mood, entry.moodScore, entry.moodEmoji || null, entry.content, JSON.stringify(entry.tags), entry.id]
+        [entry.timestamp, entry.mood, entry.moodScore, entry.moodEmoji || null, entry.moodHexColor || null, entry.content, JSON.stringify(entry.tags), entry.id]
       );
     } else {
       const entries = await this.getAllEntries();
@@ -318,6 +332,7 @@ class DatabaseService {
       mood: row.mood as string,
       moodScore: row.mood_score as number,
       moodEmoji: row.mood_emoji as string | undefined,
+      moodHexColor: row.mood_hex_color as string | undefined,
       content: row.content as string,
       tags: JSON.parse((row.tags as string) || '[]'),
       aiReply: row.ai_reply as string | undefined,
@@ -525,9 +540,9 @@ class DatabaseService {
             if (this.isNative && this.db) {
               // SQLite: 使用 INSERT OR REPLACE
               await this.db.run(
-                `INSERT OR REPLACE INTO diary_entries (id, timestamp, mood, mood_score, mood_emoji, content, tags)
-                 VALUES (?, ?, ?, ?, ?, ?, ?)`,
-                [entry.id, entry.timestamp, entry.mood, entry.moodScore, entry.moodEmoji || null, entry.content, JSON.stringify(entry.tags)]
+                `INSERT OR REPLACE INTO diary_entries (id, timestamp, mood, mood_score, mood_emoji, mood_hex_color, content, tags)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+                [entry.id, entry.timestamp, entry.mood, entry.moodScore, entry.moodEmoji || null, entry.moodHexColor || null, entry.content, JSON.stringify(entry.tags)]
               );
             } else {
               // localStorage: 合并条目
@@ -596,6 +611,67 @@ class DatabaseService {
       localStorage.removeItem(STORAGE_KEYS.ENTRIES);
       localStorage.removeItem(STORAGE_KEYS.NOTES);
       localStorage.removeItem(STORAGE_KEYS.CUSTOM_MOODS);
+    }
+  }
+
+  // ==================== 周总结操作 ====================
+
+  /**
+   * 获取指定周的总结
+   */
+  async getWeeklySummary(weekKey: string): Promise<WeeklySummary | null> {
+    await this.ensureInitialized();
+
+    if (this.isNative && this.db) {
+      const result = await this.db.query('SELECT * FROM weekly_summaries WHERE week_key = ?', [weekKey]);
+      if (result.values && result.values.length > 0) {
+        const row = result.values[0];
+        return {
+          weekKey: row.week_key as string,
+          content: row.content as string,
+          createdAt: row.created_at as number
+        };
+      }
+      return null;
+    } else {
+      const data = localStorage.getItem(STORAGE_KEYS.WEEKLY_SUMMARIES);
+      const summaries: Record<string, WeeklySummary> = data ? JSON.parse(data) : {};
+      return summaries[weekKey] || null;
+    }
+  }
+
+  /**
+   * 保存周总结
+   */
+  async saveWeeklySummary(summary: WeeklySummary): Promise<void> {
+    await this.ensureInitialized();
+
+    if (this.isNative && this.db) {
+      await this.db.run(
+        `INSERT OR REPLACE INTO weekly_summaries (week_key, content, created_at) VALUES (?, ?, ?)`,
+        [summary.weekKey, summary.content, summary.createdAt]
+      );
+    } else {
+      const data = localStorage.getItem(STORAGE_KEYS.WEEKLY_SUMMARIES);
+      const summaries: Record<string, WeeklySummary> = data ? JSON.parse(data) : {};
+      summaries[summary.weekKey] = summary;
+      localStorage.setItem(STORAGE_KEYS.WEEKLY_SUMMARIES, JSON.stringify(summaries));
+    }
+  }
+
+  /**
+   * 删除指定周的总结
+   */
+  async deleteWeeklySummary(weekKey: string): Promise<void> {
+    await this.ensureInitialized();
+
+    if (this.isNative && this.db) {
+      await this.db.run('DELETE FROM weekly_summaries WHERE week_key = ?', [weekKey]);
+    } else {
+      const data = localStorage.getItem(STORAGE_KEYS.WEEKLY_SUMMARIES);
+      const summaries: Record<string, WeeklySummary> = data ? JSON.parse(data) : {};
+      delete summaries[weekKey];
+      localStorage.setItem(STORAGE_KEYS.WEEKLY_SUMMARIES, JSON.stringify(summaries));
     }
   }
 }

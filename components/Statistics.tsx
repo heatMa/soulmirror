@@ -5,6 +5,7 @@ import HeatmapChart from './HeatmapChart';
 import MoodHistory from './MoodHistory';
 import MoodHourlyDistribution from './MoodHourlyDistribution';
 import TriggerAnalysisChart from './TriggerAnalysisChart';
+import { WeeklySummaryCard } from './WeeklySummaryCard';
 import { generateWeeklyReport, WeeklyReport, DailySummary } from '../services/geminiService';
 
 interface Props {
@@ -127,9 +128,6 @@ const Statistics: React.FC<Props> = ({ entries, customMoods }) => {
   const handleGenerateReport = async () => {
     setIsLoadingReport(true);
     try {
-      const weekEntries = entries.filter(e =>
-        e.timestamp >= Date.now() - 7 * 24 * 60 * 60 * 1000
-      );
       const report = await generateWeeklyReport(weekEntries);
       setWeeklyReport(report);
     } catch (error) {
@@ -138,6 +136,24 @@ const Statistics: React.FC<Props> = ({ entries, customMoods }) => {
       setIsLoadingReport(false);
     }
   };
+
+  // 获取当前周的 weekKey (格式: '2025-W06')
+  const getWeekKey = () => {
+    const now = new Date();
+    const currentYear = now.getFullYear();
+    const startOfYear = new Date(currentYear, 0, 1);
+    const diff = now.getTime() - startOfYear.getTime();
+    const oneWeek = 7 * 24 * 60 * 60 * 1000;
+    const weekNumber = Math.floor(diff / oneWeek) + 1;
+    return `${currentYear}-W${String(weekNumber).padStart(2, '0')}`;
+  };
+
+  // 获取本周的日记条目
+  const weekEntries = useMemo(() => {
+    return entries.filter(e =>
+      e.timestamp >= Date.now() - 7 * 24 * 60 * 60 * 1000
+    );
+  }, [entries]);
 
   return (
     <div className="flex-1 px-4 pt-safe-top pb-24 overflow-y-auto no-scrollbar">
@@ -347,6 +363,9 @@ const Statistics: React.FC<Props> = ({ entries, customMoods }) => {
           <TriggerAnalysisChart entries={entries.filter(e =>
             e.timestamp >= Date.now() - 7 * 24 * 60 * 60 * 1000
           )} />
+
+          {/* 本周叙事性总结 */}
+          <WeeklySummaryCard weekKey={getWeekKey()} weekEntries={weekEntries} />
 
           {!weeklyReport && !isLoadingReport && (
             <div className="glass-card rounded-[2rem] p-6 text-center">

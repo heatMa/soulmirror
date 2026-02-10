@@ -5,6 +5,7 @@ export interface DiaryEntry {
   mood: string;
   moodScore: number; // 1-10
   moodEmoji?: string; // 心情表情，用于删除心情配置后仍能正确显示
+  moodHexColor?: string; // 心情主题色，用于删除心情配置后仍能正确显示
   content: string;
   tags: string[];
   aiReply?: string; // AI 暖心回复
@@ -22,6 +23,12 @@ export interface AIAnalysis {
   suggestions: string[];
   peaks: string[]; // Good time periods/events
   valleys: string[]; // Challenging time periods/events
+}
+
+export interface WeeklySummary {
+  weekKey: string;          // Format: '2025-W06'
+  content: string;          // AI generated narrative summary
+  createdAt: number;        // Timestamp when summary was generated
 }
 
 export enum ViewMode {
