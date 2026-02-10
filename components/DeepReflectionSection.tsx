@@ -23,6 +23,11 @@ const DeepReflectionSection: React.FC<Props> = ({ selectedDate, moodEntries }) =
 
   const dateStr = selectedDate.toLocaleDateString('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit' }).replace(/\//g, '-');
 
+  // 判断是否有内容可以生成分析
+  const hasJournal = journalContent.trim().length > 0;
+  const hasMoods = moodEntries.length > 0;
+  const hasAnyContent = hasJournal || hasMoods;
+
   // Load journal and deep reflection when date changes
   useEffect(() => {
     loadJournalData();
@@ -78,11 +83,24 @@ const DeepReflectionSection: React.FC<Props> = ({ selectedDate, moodEntries }) =
   };
 
   const handleGenerateClick = () => {
-    if (!journalContent.trim()) {
-      setError('请先写入日记内容');
+    // 如果既没有日记也没有心情记录，不应该执行（按钮应该是disabled的）
+    if (!hasAnyContent) {
+      setError('请先记录今日心情或写日记');
       return;
     }
-    setShowSourceDialog(true);
+
+    // 自动选择逻辑
+    if (hasJournal && hasMoods) {
+      // 两者都有 → 弹窗选择
+      setShowSourceDialog(true);
+    } else if (hasJournal && !hasMoods) {
+      // 只有日记 → 直接用日记
+      handleGenerate('journal-only');
+    } else if (!hasJournal && hasMoods) {
+      // 只有心情 → 直接用心情
+      handleGenerate('journal-with-moods');
+    }
+
     setError('');
   };
 
@@ -119,7 +137,14 @@ const DeepReflectionSection: React.FC<Props> = ({ selectedDate, moodEntries }) =
   };
 
   const handleRegenerate = () => {
-    setShowSourceDialog(true);
+    // 重新生成时也使用自动选择逻辑
+    if (hasJournal && hasMoods) {
+      setShowSourceDialog(true);
+    } else if (hasJournal) {
+      handleGenerate('journal-only');
+    } else if (hasMoods) {
+      handleGenerate('journal-with-moods');
+    }
   };
 
   return (
@@ -153,40 +178,63 @@ const DeepReflectionSection: React.FC<Props> = ({ selectedDate, moodEntries }) =
       {/* Expanded Content */}
       {isExpanded && (
         <div className="mt-4 space-y-4">
-          {/* 日记编辑器 */}
-          <DailyNoteEditor
-            dateStr={dateStr}
-            initialContent={journalContent}
-            onSave={handleJournalSave}
-          />
+          {/* 日记编辑器包装 - 添加标题行和生成按钮 */}
+          <div>
+            {/* 标题行：日记 + 生成按钮 */}
+            <div className="flex justify-between items-center mb-2 px-2">
+              <div className="flex items-center gap-2">
+                <span className="text-gray-400"><ICONS.Pen /></span>
+                <h4 className="text-sm font-bold text-gray-600">日记</h4>
+              </div>
 
-          {/* 生成分析按钮 */}
-          <button
-            onClick={handleGenerateClick}
-            disabled={!journalContent.trim() || isGenerating}
-            className={`w-full py-2.5 px-4 rounded-xl font-semibold text-white transition-all ${
-              isGenerating
-                ? 'bg-gray-300 cursor-not-allowed'
-                : !journalContent.trim()
-                ? 'bg-gray-300 cursor-not-allowed'
-                : deepReflection
-                ? 'bg-indigo-600 hover:bg-indigo-700'
-                : 'bg-indigo-600 hover:bg-indigo-700'
-            }`}
-          >
-            {isGenerating ? (
-              <span className="flex items-center justify-center gap-2">
-                <svg className="w-4 h-4 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                </svg>
-                生成中...
-              </span>
-            ) : deepReflection ? (
-              '重新生成深度回看'
-            ) : (
-              '生成深度回看'
-            )}
-          </button>
+              {/* 生成深度回看按钮 */}
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleGenerateClick();
+                }}
+                disabled={!hasAnyContent || isGenerating}
+                title={!hasAnyContent ? '请先记录今日心情或写日记' : ''}
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1 ${
+                  isGenerating
+                    ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                    : !hasAnyContent
+                    ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                    : 'bg-indigo-600 text-white hover:bg-indigo-700 active:scale-95'
+                }`}
+              >
+                {isGenerating ? (
+                  <>
+                    <svg className="w-3 h-3 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                    </svg>
+                    生成中
+                  </>
+                ) : deepReflection ? (
+                  <>
+                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                    </svg>
+                    重新生成
+                  </>
+                ) : (
+                  <>
+                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+                    </svg>
+                    生成深度回看
+                  </>
+                )}
+              </button>
+            </div>
+
+            {/* 富文本编辑器 */}
+            <DailyNoteEditor
+              dateStr={dateStr}
+              initialContent={journalContent}
+              onSave={handleJournalSave}
+            />
+          </div>
 
           {/* Error Message */}
           {error && (
@@ -255,12 +303,25 @@ const DeepReflectionSection: React.FC<Props> = ({ selectedDate, moodEntries }) =
         </div>
       )}
 
-      {/* Source Selection Dialog */}
+      {/* Source Selection Dialog - 默认选中"日记+心情记录" */}
       {showSourceDialog && (
         <div className="fixed inset-0 bg-black/50 flex items-end sm:items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl p-6 w-full max-w-sm shadow-lg animate-in slide-in-from-bottom-8">
             <h3 className="text-lg font-bold text-gray-800 mb-4">选择分析来源</h3>
             <div className="space-y-3">
+              {/* 日记 + 心情记录（默认推荐） */}
+              <button
+                onClick={() => handleGenerate('journal-with-moods')}
+                className="w-full p-4 border-2 border-indigo-400 bg-indigo-50 rounded-xl hover:border-indigo-600 transition-all text-left"
+              >
+                <div className="font-semibold text-indigo-700">
+                  📝+😊 日记 + 心情记录（推荐）
+                </div>
+                <div className="text-sm text-indigo-600 mt-1">
+                  包含今天的 {moodEntries.length} 条心情记录，分析更全面
+                </div>
+              </button>
+
               {/* 仅日记 */}
               <button
                 onClick={() => handleGenerate('journal-only')}
@@ -268,19 +329,6 @@ const DeepReflectionSection: React.FC<Props> = ({ selectedDate, moodEntries }) =
               >
                 <div className="font-semibold text-gray-800">📝 仅日记</div>
                 <div className="text-sm text-gray-500 mt-1">只分析今天的日记内容</div>
-              </button>
-
-              {/* 日记 + 心情记录 */}
-              <button
-                onClick={() => handleGenerate('journal-with-moods')}
-                className="w-full p-4 border-2 border-indigo-400 bg-indigo-50 rounded-xl hover:border-indigo-600 transition-all text-left"
-              >
-                <div className="font-semibold text-indigo-700">
-                  📝+😊 日记 + 心情记录
-                </div>
-                <div className="text-sm text-indigo-600 mt-1">
-                  包含今天的 {moodEntries.length} 条心情记录
-                </div>
               </button>
             </div>
 
