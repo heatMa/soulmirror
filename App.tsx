@@ -77,14 +77,24 @@ const App: React.FC = () => {
     }
   }, [showAddForm]);
 
-  // 设置问候语
+  // 设置问候语（并自动更新）
   useEffect(() => {
-    const hour = new Date().getHours();
-    if (hour < 6) setGreeting('夜深了，愿你安梦');
-    else if (hour < 11) setGreeting('早上好，开启新的一天');
-    else if (hour < 14) setGreeting('午安，记得小憩一会');
-    else if (hour < 18) setGreeting('下午好，享受这段时光');
-    else setGreeting('晚上好，卸下一身疲惫');
+    const updateGreeting = () => {
+      const hour = new Date().getHours();
+      if (hour < 6) setGreeting('夜深了，愿你安梦');
+      else if (hour < 11) setGreeting('早上好，开启新的一天');
+      else if (hour < 14) setGreeting('午安，记得小憩一会');
+      else if (hour < 18) setGreeting('下午好，享受这段时光');
+      else setGreeting('晚上好，卸下一身疲惫');
+    };
+
+    // 立即执行一次
+    updateGreeting();
+
+    // 每分钟更新一次问候语
+    const interval = setInterval(updateGreeting, 60000);
+
+    return () => clearInterval(interval);
   }, []);
 
   // 保存日记条目
@@ -286,15 +296,17 @@ const App: React.FC = () => {
     })
     .sort((a, b) => b.timestamp - a.timestamp);
 
-  // 计算每条记录的频次统计（今天、本周、本月）
+  // 计算每条记录的频次统计（今天、本周、本月）- 只统计相同心情标签
   const getEntryCounts = (entry: DiaryEntry) => {
     const entryDate = new Date(entry.timestamp);
+    const moodLabel = entry.mood; // 心情标签
 
-    // 今天的记录（按时间升序统计到当前记录为止）
+    // 今天的记录（按时间升序统计到当前记录为止，只统计相同心情）
     const todayEntries = entries
       .filter(e => {
         const eDate = new Date(e.timestamp);
-        return eDate.getDate() === entryDate.getDate() &&
+        return e.mood === moodLabel &&
+               eDate.getDate() === entryDate.getDate() &&
                eDate.getMonth() === entryDate.getMonth() &&
                eDate.getFullYear() === entryDate.getFullYear() &&
                e.timestamp <= entry.timestamp;
@@ -302,7 +314,7 @@ const App: React.FC = () => {
       .sort((a, b) => a.timestamp - b.timestamp);
     const countToday = todayEntries.findIndex(e => e.id === entry.id) + 1;
 
-    // 本周的记录（周一到周日）
+    // 本周的记录（周一到周日，只统计相同心情）
     const getWeekStart = (date: Date) => {
       const d = new Date(date);
       const day = d.getDay();
@@ -317,16 +329,20 @@ const App: React.FC = () => {
     const weekEntries = entries
       .filter(e => {
         const eDate = new Date(e.timestamp);
-        return eDate >= weekStart && eDate < weekEnd && e.timestamp <= entry.timestamp;
+        return e.mood === moodLabel &&
+               eDate >= weekStart &&
+               eDate < weekEnd &&
+               e.timestamp <= entry.timestamp;
       })
       .sort((a, b) => a.timestamp - b.timestamp);
     const countWeek = weekEntries.findIndex(e => e.id === entry.id) + 1;
 
-    // 本月的记录
+    // 本月的记录（只统计相同心情）
     const monthEntries = entries
       .filter(e => {
         const eDate = new Date(e.timestamp);
-        return eDate.getMonth() === entryDate.getMonth() &&
+        return e.mood === moodLabel &&
+               eDate.getMonth() === entryDate.getMonth() &&
                eDate.getFullYear() === entryDate.getFullYear() &&
                e.timestamp <= entry.timestamp;
       })
