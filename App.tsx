@@ -232,6 +232,23 @@ const App: React.FC = () => {
     }
   }, []);
 
+  // 结束情绪记录（设置结束时间）
+  const endMood = useCallback(async (entry: DiaryEntry) => {
+    try {
+      const updatedEntry: DiaryEntry = {
+        ...entry,
+        endTimestamp: Date.now(),
+        isActive: false,
+        duration: undefined, // 清空手动填写的时长，优先使用自动计算
+      };
+      await databaseService.updateEntry(updatedEntry);
+      setEntries(prev => prev.map(e => (e.id === entry.id ? updatedEntry : e)));
+    } catch (error) {
+      console.error('结束情绪失败:', error);
+      alert('操作失败，请重试');
+    }
+  }, []);
+
   // 保存每日笔记
   const saveDailyNote = useCallback(async (dateStr: string, content: string) => {
     try {
@@ -495,6 +512,7 @@ const App: React.FC = () => {
                         isLast={isLast}
                         onEdit={openEditModal}
                         onDelete={deleteEntry}
+                        onEndMood={endMood}
                         countToday={countToday}
                         countWeek={countWeek}
                         countMonth={countMonth}

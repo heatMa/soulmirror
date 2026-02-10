@@ -10,6 +10,9 @@ export interface DiaryEntry {
   tags: string[];
   aiReply?: string; // AI 暖心回复
   aiSuggestions?: string[]; // AI 情绪调节建议（负面情绪时生成）
+  endTimestamp?: number; // 情绪结束时间（可选，用于自动计算持续时长）
+  duration?: number; // 手动填写的持续时长（分钟，可选）
+  isActive?: boolean; // 是否进行中（未结束）
 }
 
 export interface AIAnalysis {

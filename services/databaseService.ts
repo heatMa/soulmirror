@@ -27,7 +27,10 @@ CREATE TABLE IF NOT EXISTS diary_entries (
   content TEXT NOT NULL,
   tags TEXT DEFAULT '[]',
   ai_reply TEXT,
-  ai_suggestions TEXT
+  ai_suggestions TEXT,
+  end_timestamp INTEGER,
+  duration INTEGER,
+  is_active INTEGER DEFAULT 0
 );
 
 CREATE TABLE IF NOT EXISTS daily_notes (
@@ -195,6 +198,28 @@ class DatabaseService {
         await this.db.execute('ALTER TABLE daily_notes ADD COLUMN deep_reflection_timestamp INTEGER');
         console.log('数据库迁移：添加 deep_reflection_timestamp 列');
       }
+
+      // 检查 diary_entries 表是否有持续时间相关列
+      const entriesTableInfo = await this.db.query("PRAGMA table_info(diary_entries)");
+      const entriesColumns = entriesTableInfo.values || [];
+      const hasEndTimestamp = entriesColumns.some((col: any) => col.name === 'end_timestamp');
+      const hasDuration = entriesColumns.some((col: any) => col.name === 'duration');
+      const hasIsActive = entriesColumns.some((col: any) => col.name === 'is_active');
+
+      if (!hasEndTimestamp) {
+        await this.db.execute('ALTER TABLE diary_entries ADD COLUMN end_timestamp INTEGER');
+        console.log('数据库迁移：添加 end_timestamp 列');
+      }
+
+      if (!hasDuration) {
+        await this.db.execute('ALTER TABLE diary_entries ADD COLUMN duration INTEGER');
+        console.log('数据库迁移：添加 duration 列');
+      }
+
+      if (!hasIsActive) {
+        await this.db.execute('ALTER TABLE diary_entries ADD COLUMN is_active INTEGER DEFAULT 0');
+        console.log('数据库迁移：添加 is_active 列');
+      }
     } catch (error) {
       console.error('数据库迁移失败:', error);
     }
@@ -242,9 +267,21 @@ class DatabaseService {
 
     if (this.isNative && this.db) {
       await this.db.run(
-        `INSERT INTO diary_entries (id, timestamp, mood, mood_score, mood_emoji, mood_hex_color, content, tags)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-        [id, entry.timestamp, entry.mood, entry.moodScore, entry.moodEmoji || null, entry.moodHexColor || null, entry.content, JSON.stringify(entry.tags)]
+        `INSERT INTO diary_entries (id, timestamp, mood, mood_score, mood_emoji, mood_hex_color, content, tags, end_timestamp, duration, is_active)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          id,
+          entry.timestamp,
+          entry.mood,
+          entry.moodScore,
+          entry.moodEmoji || null,
+          entry.moodHexColor || null,
+          entry.content,
+          JSON.stringify(entry.tags),
+          entry.endTimestamp || null,
+          entry.duration || null,
+          entry.isActive ? 1 : 0
+        ]
       );
     } else {
       const entries = await this.getAllEntries();
@@ -264,9 +301,21 @@ class DatabaseService {
     if (this.isNative && this.db) {
       await this.db.run(
         `UPDATE diary_entries
-         SET timestamp = ?, mood = ?, mood_score = ?, mood_emoji = ?, mood_hex_color = ?, content = ?, tags = ?
+         SET timestamp = ?, mood = ?, mood_score = ?, mood_emoji = ?, mood_hex_color = ?, content = ?, tags = ?, end_timestamp = ?, duration = ?, is_active = ?
          WHERE id = ?`,
-        [entry.timestamp, entry.mood, entry.moodScore, entry.moodEmoji || null, entry.moodHexColor || null, entry.content, JSON.stringify(entry.tags), entry.id]
+        [
+          entry.timestamp,
+          entry.mood,
+          entry.moodScore,
+          entry.moodEmoji || null,
+          entry.moodHexColor || null,
+          entry.content,
+          JSON.stringify(entry.tags),
+          entry.endTimestamp || null,
+          entry.duration || null,
+          entry.isActive ? 1 : 0,
+          entry.id
+        ]
       );
     } else {
       const entries = await this.getAllEntries();
@@ -361,7 +410,10 @@ class DatabaseService {
       content: row.content as string,
       tags: JSON.parse((row.tags as string) || '[]'),
       aiReply: row.ai_reply as string | undefined,
-      aiSuggestions: row.ai_suggestions ? JSON.parse(row.ai_suggestions as string) : undefined
+      aiSuggestions: row.ai_suggestions ? JSON.parse(row.ai_suggestions as string) : undefined,
+      endTimestamp: row.end_timestamp as number | undefined,
+      duration: row.duration as number | undefined,
+      isActive: Boolean(row.is_active)
     };
   }
 

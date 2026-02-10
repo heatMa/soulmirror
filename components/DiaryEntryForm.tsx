@@ -4,6 +4,7 @@ import { DiaryEntry } from '../types';
 import { MOOD_OPTIONS, MoodOption, ICONS, MOOD_COLOR_PALETTE, getHexFromTailwind } from '../constants';
 import { generateMoodMetadata } from '../services/geminiService';
 import { databaseService } from '../services/databaseService';
+import { formatDuration, parseDurationInput, calculateDurationInMinutes } from '../utils/timeUtils';
 
 interface Props {
   initialData?: DiaryEntry | null;
@@ -30,8 +31,10 @@ const DiaryEntryForm: React.FC<Props> = ({ initialData, onSave, onClose }) => {
   const [isAddingMood, setIsAddingMood] = useState(false);
   const [isGeneratingTag, setIsGeneratingTag] = useState(false);
   const [isRegenerating, setIsRegenerating] = useState(false);
-  const [showColorPicker, setShowColorPicker] = useState<string | null>(null); // 存储正在编辑颜色的心情 label
+  const [showColorPicker, setShowColorPicker] = useState<string | null>(null);
   const [activeColor, setActiveColor] = useState<string>('#374151');
+  const [durationInput, setDurationInput] = useState<string>(''); // 持续时间输入
+  const [isActive, setIsActive] = useState(false); // 是否进行中
   const contentRef = useRef<HTMLDivElement>(null);
 
   // 获取合并了自定义配置的内置心情列表
@@ -94,6 +97,17 @@ const DiaryEntryForm: React.FC<Props> = ({ initialData, onSave, onClose }) => {
             suggestions: []
         });
       }
+
+      // 初始化持续时间
+      if (initialData.endTimestamp) {
+        const minutes = calculateDurationInMinutes(initialData.timestamp, initialData.endTimestamp);
+        setDurationInput(formatDuration(minutes));
+      } else if (initialData.duration) {
+        setDurationInput(formatDuration(initialData.duration));
+      }
+
+      // 初始化进行中状态
+      setIsActive(initialData.isActive || false);
     }
   }, [initialData, customMoods]);
 
@@ -224,6 +238,17 @@ const DiaryEntryForm: React.FC<Props> = ({ initialData, onSave, onClose }) => {
     const content = contentRef.current?.innerHTML || '';
     if (!content.trim() || content === '<br>') return;
 
+    // 解析持续时间
+    let duration: number | undefined;
+    if (durationInput.trim()) {
+      const parsed = parseDurationInput(durationInput);
+      if (parsed === null) {
+        alert('请输入有效的持续时间（如"2小时30分"、"1小时"或"45分钟"）');
+        return;
+      }
+      duration = parsed;
+    }
+
     onSave({
       id: initialData?.id,
       timestamp: initialData?.timestamp,
@@ -232,7 +257,10 @@ const DiaryEntryForm: React.FC<Props> = ({ initialData, onSave, onClose }) => {
       moodScore: selectedMood.score,
       moodEmoji: selectedMood.emoji,
       moodHexColor: selectedMood.hexColor || getHexFromTailwind(selectedMood.color),
-      tags: [selectedMood.label]
+      tags: [selectedMood.label],
+      duration: duration,
+      isActive: isActive,
+      endTimestamp: initialData?.endTimestamp, // 编辑时保留原始的 endTimestamp
     });
 
     onClose();
@@ -537,6 +565,35 @@ const DiaryEntryForm: React.FC<Props> = ({ initialData, onSave, onClose }) => {
                     {activeColor === color.value && (
                       <div className="w-1.5 h-1.5 rounded-full" style={{backgroundColor: color.value}}></div>
                     )}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* 持续时间输入 */}
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-gray-600 block">⏱️ 持续时间（可选）</label>
+              <input
+                type="text"
+                value={durationInput}
+                onChange={(e) => setDurationInput(e.target.value)}
+                placeholder="如：2小时30分、1小时、45分钟"
+                className="w-full px-4 py-3 bg-white rounded-2xl border border-gray-200 focus:border-indigo-300 focus:outline-none transition-colors text-sm"
+              />
+              <div className="flex flex-wrap gap-2">
+                {[
+                  { label: '30分钟', value: '30分钟' },
+                  { label: '1小时', value: '1小时' },
+                  { label: '2小时', value: '2小时' },
+                  { label: '半天', value: '4小时' },
+                ].map((option) => (
+                  <button
+                    key={option.value}
+                    type="button"
+                    onClick={() => setDurationInput(option.value)}
+                    className="px-3 py-1 text-xs font-medium rounded-lg bg-indigo-50 text-indigo-600 hover:bg-indigo-100 transition-colors"
+                  >
+                    {option.label}
                   </button>
                 ))}
               </div>
