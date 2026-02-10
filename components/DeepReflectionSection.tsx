@@ -178,63 +178,16 @@ const DeepReflectionSection: React.FC<Props> = ({ selectedDate, moodEntries }) =
       {/* Expanded Content */}
       {isExpanded && (
         <div className="mt-4 space-y-4">
-          {/* 日记编辑器包装 - 添加标题行和生成按钮 */}
-          <div>
-            {/* 标题行：日记 + 生成按钮 */}
-            <div className="flex justify-between items-center mb-2 px-2">
-              <div className="flex items-center gap-2">
-                <span className="text-gray-400"><ICONS.Pen /></span>
-                <h4 className="text-sm font-bold text-gray-600">日记</h4>
-              </div>
-
-              {/* 生成深度回看按钮 */}
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleGenerateClick();
-                }}
-                disabled={!hasAnyContent || isGenerating}
-                title={!hasAnyContent ? '请先记录今日心情或写日记' : ''}
-                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1 ${
-                  isGenerating
-                    ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                    : !hasAnyContent
-                    ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
-                    : 'bg-indigo-600 text-white hover:bg-indigo-700 active:scale-95'
-                }`}
-              >
-                {isGenerating ? (
-                  <>
-                    <svg className="w-3 h-3 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                    </svg>
-                    生成中
-                  </>
-                ) : deepReflection ? (
-                  <>
-                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                    </svg>
-                    重新生成
-                  </>
-                ) : (
-                  <>
-                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
-                    </svg>
-                    生成深度回看
-                  </>
-                )}
-              </button>
-            </div>
-
-            {/* 富文本编辑器 */}
-            <DailyNoteEditor
-              dateStr={dateStr}
-              initialContent={journalContent}
-              onSave={handleJournalSave}
-            />
-          </div>
+          {/* 日记编辑器（按钮已集成到编辑器内部） */}
+          <DailyNoteEditor
+            dateStr={dateStr}
+            initialContent={journalContent}
+            onSave={handleJournalSave}
+            onGenerateClick={handleGenerateClick}
+            isGenerating={isGenerating}
+            hasDeepReflection={!!deepReflection}
+            canGenerate={hasAnyContent}
+          />
 
           {/* Error Message */}
           {error && (
