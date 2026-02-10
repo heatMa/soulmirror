@@ -68,7 +68,7 @@ const DailyNoteEditor: React.FC<Props> = ({ dateStr, initialContent, onSave }) =
       <div className="flex justify-between items-center px-1 border-b border-gray-100/80 pb-3">
          <div className="flex items-center gap-2">
              <span className="text-gray-400"><ICONS.Pen /></span>
-             <h4 className="text-sm font-bold text-gray-600">每日随笔</h4>
+             <h4 className="text-sm font-bold text-gray-600">日记</h4>
          </div>
          <div className="flex items-center gap-1">
              <button 
