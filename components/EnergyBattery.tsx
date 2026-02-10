@@ -142,7 +142,8 @@ const EnergyBattery: React.FC<Props> = ({ entries, allEntries, customMoods = [] 
 
     return sortedEntries.map(entry => {
       const config = getMoodConfig(entry.mood);
-      const hexColor = config?.hexColor || getHexFromTailwind(config?.color || 'bg-gray-400');
+      // 优先使用 entry 保存的颜色，其次是配置的颜色，最后是默认颜色
+      const hexColor = entry.moodHexColor || config?.hexColor || getHexFromTailwind(config?.color || 'bg-gray-400');
       const score = entry.moodScore || 1;
 
       return {
@@ -150,7 +151,7 @@ const EnergyBattery: React.FC<Props> = ({ entries, allEntries, customMoods = [] 
         score,
         mood: entry.mood,
         hexColor,
-        emoji: config?.emoji || '🏷️',
+        emoji: entry.moodEmoji || config?.emoji || '🏷️',
         time: new Date(entry.timestamp).toLocaleTimeString('zh-CN', {
           hour: '2-digit',
           minute: '2-digit'

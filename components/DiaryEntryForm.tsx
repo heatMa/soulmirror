@@ -231,6 +231,7 @@ const DiaryEntryForm: React.FC<Props> = ({ initialData, onSave, onClose }) => {
       mood: selectedMood.label,
       moodScore: selectedMood.score,
       moodEmoji: selectedMood.emoji,
+      moodHexColor: selectedMood.hexColor || getHexFromTailwind(selectedMood.color),
       tags: [selectedMood.label]
     });
 

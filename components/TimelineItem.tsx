@@ -184,7 +184,7 @@ const TimelineItem: React.FC<Props> = ({ entry, moodConfig, isLast, onEdit, onDe
                if (!showDeleteBtn) toggleCollapse();
              }}
            >
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                  {/* Emoji */}
                  <span className="text-base">{moodConfig.emoji}</span>
                  <span
@@ -214,7 +214,7 @@ const TimelineItem: React.FC<Props> = ({ entry, moodConfig, isLast, onEdit, onDe
 
               <button
                 onClick={(e) => { e.stopPropagation(); onEdit(entry); }}
-                className="p-1.5 hover:bg-gray-50 rounded-full transition-colors"
+                className="p-1.5 hover:bg-gray-50 rounded-full transition-colors flex-shrink-0"
                 style={{ color: moodHexColor }}
               >
                  <ICONS.Pen />

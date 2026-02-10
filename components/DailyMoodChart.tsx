@@ -103,7 +103,11 @@ const DailyMoodChart: React.FC<Props> = ({ entries, customMoods = [] }) => {
   const allMoodConfigs = [...MOOD_OPTIONS, ...customMoods];
 
   // 根据心情标签获取颜色
-  const getMoodHexColor = (moodLabel: string): string => {
+  const getMoodHexColor = (moodLabel: string, entry?: DiaryEntry): string => {
+    // 优先使用 entry 保存的颜色
+    if (entry?.moodHexColor) {
+      return entry.moodHexColor;
+    }
     const config = allMoodConfigs.find(m => m.label === moodLabel);
     if (config) {
       return config.hexColor || getHexFromTailwind(config.color);
@@ -125,7 +129,7 @@ const DailyMoodChart: React.FC<Props> = ({ entries, customMoods = [] }) => {
         mood: e.mood,
         content: e.content,
         time: date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        hexColor: getMoodHexColor(e.mood)
+        hexColor: getMoodHexColor(e.mood, e)
       };
     });
 
