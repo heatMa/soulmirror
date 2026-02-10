@@ -37,6 +37,15 @@ export enum ViewMode {
   STATISTICS = 'statistics'
 }
 
+// 每日日记和深度回看
+export interface DailyJournal {
+  date: string;                                      // YYYY-MM-DD
+  content: string;                                   // 日记内容（富文本HTML）
+  deepReflection?: string;                           // AI深度回看内容（纯文本）
+  deepReflectionSource?: 'journal-only' | 'journal-with-moods';  // 分析来源
+  deepReflectionTimestamp?: number;                  // AI分析生成时间戳
+}
+
 // 备份数据接口
 export interface BackupData {
   version: string;

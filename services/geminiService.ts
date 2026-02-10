@@ -84,6 +84,53 @@ async function callDeepSeek(systemPrompt: string, userPrompt: string): Promise<s
   }
 }
 
+// DeepSeek 文本模式调用（用于深度回看等非结构化输出）
+async function callDeepSeekText(systemPrompt: string, userPrompt: string): Promise<string> {
+  const requestBody = {
+    model: "deepseek-chat",
+    messages: [
+      { role: "system", content: systemPrompt },
+      { role: "user", content: userPrompt }
+    ],
+    temperature: 1.0
+  };
+
+  try {
+    let response: Response;
+
+    if (USE_PROXY) {
+      console.log("Using AI Proxy (Text Mode)...");
+      response = await fetch(AI_PROXY_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(requestBody)
+      });
+    } else {
+      if (!DEEPSEEK_API_KEY) throw new Error("DeepSeek API Key 未配置");
+      console.log("Using DeepSeek Direct (Text Mode)...");
+      response = await fetch(DEEPSEEK_DIRECT_URL, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${DEEPSEEK_API_KEY}`
+        },
+        body: JSON.stringify(requestBody)
+      });
+    }
+
+    if (!response.ok) {
+      const errText = await response.text();
+      throw new Error(`DeepSeek API Error: ${response.status} - ${errText}`);
+    }
+
+    const data = await response.json();
+    return data.choices[0].message.content || "";
+  } catch (error) {
+    console.error("DeepSeek Text Call Failed:", error);
+    throw error;
+  }
+}
+
 // 辅助函数：清理 JSON 字符串 (有时候模型会返回 ```json ... ```)
 function cleanJsonString(str: string): string {
   if (!str) return "{}";
@@ -529,6 +576,97 @@ export const generateWeeklyReport = async (entries: DiaryEntry[]): Promise<Weekl
       negativePeaks: [],
       suggestions: []
     };
+  }
+};
+
+// 生成每日深度回看分析
+export const generateDailyDeepReflection = async (
+  journalContent: string,
+  moodEntries: DiaryEntry[],
+  analysisType: 'journal-only' | 'journal-with-moods'
+): Promise<string> => {
+  // 移除日记内容中的HTML标签
+  const cleanJournalContent = journalContent.replace(/<[^>]*>/g, '').trim();
+
+  // 格式化心情记录
+  let moodSummary = '';
+  if (analysisType === 'journal-with-moods' && moodEntries.length > 0) {
+    // 按时间排序
+    const sortedEntries = [...moodEntries].sort((a, b) => a.timestamp - b.timestamp);
+
+    // 总-分结构
+    moodSummary = `\n【今日心情记录】（${moodEntries.length}条）：\n`;
+    moodSummary += '- ' + sortedEntries.map(e => {
+      const time = new Date(e.timestamp).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
+      return `${e.mood}(${time}, ${e.moodScore}分)`;
+    }).join('\n- ') + '\n';
+
+    moodSummary += '\n【详细内容】：\n';
+    moodSummary += sortedEntries.map(e => {
+      const time = new Date(e.timestamp).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
+      const emoji = e.moodEmoji || '📝';
+      const contentText = e.content.replace(/<[^>]*>/g, '');
+      return `${emoji} ${e.mood} (${time}, ${e.moodScore}分)\n${contentText}`;
+    }).join('\n\n');
+  }
+
+  const userPrompt = `${analysisType === 'journal-with-moods' ? moodSummary : ''}
+
+【今日日记】：
+${cleanJournalContent}`;
+
+  const systemPrompt = `# Role
+你是一位融合了纳瓦尔(Naval)、芒格(Munger)与柏拉图(Plato)智慧的深度反思陪伴者。你是一面精准的镜子，擅长从零碎的情绪波动和日记记述中，抽离出用户未察觉的思维惯性。
+
+${analysisType === 'journal-with-moods' ? `# Input Context
+- **心情快照**：用户全天记录了 ${moodEntries.length} 次瞬时情绪（包含时间、分值及简短成因）。
+- **深度日记**：用户对今日经历的系统性总结。
+
+# Analysis Task
+1. **聚合分析**：对比"瞬时情绪记录"与"深度日记"的温差。用户是在碎片时间更容易焦虑，还是在总结时过度美化/内耗？
+2. **逻辑穿透**：识别这些零碎记录中反复出现的触发点（Trigger）。` : `# Analysis Task
+对用户今日的日记进行深度反思分析。`}
+
+# Output Strategy & Constraints
+- **字数**：350–500 字。
+- **语气**：冷峻、精准、不讨好。禁止使用"我看到你今天很辛苦"等感性废话。
+- **核心逻辑**：
+    - 纳瓦尔视角：判断这些碎片化的精力消耗是否在构建长期复利。
+    - 芒格视角：识别碎片情绪背后的"心理误判"或情绪波动陷阱。
+    - 柏拉图/孔子视角：分析用户在琐事中如何维持（或丧失）内心的秩序感。
+
+# Response Format
+
+### 1. 核心映射 (The Mirror)
+[用一句话精准描述：这堆碎片记录背后，反映了用户今日灵魂的哪种"主色调"或思维惯性？]
+
+### 2. 模式拆解 (Pattern Analysis)
+${analysisType === 'journal-with-moods' ? `[结合"心情记录"的时间分布与"日记正文"进行穿透分析。例如：午后的频繁焦虑是否指向特定的工作压力？碎片记录中的负能量是否在深度日记中被理性化了？字数 150 字左右。]` : `[对日记内容进行深度分析，字数 150 字左右。]`}
+
+### 3. 灵魂追问 (Socratic Inquiry)
+[提出 1 个让用户无法回避、必须直面真实自我的本质问题。]
+
+### 4. 微小杠杆 (Action)
+[针对识别出的模式，提供 1-2 条具体的、哪怕是修正一个微小习惯的建议。]
+
+### 5. 智者赠言 (Warning)
+[一句极简、有力、具有穿透力的提醒。]
+
+# Interaction Principles
+${analysisType === 'journal-with-moods' ? `- 若碎片记录与日记正文存在矛盾，务必直接指出这种"言行不一"。` : ''}
+- 关注精力分配的合理性，而非单纯的情绪安抚。`;
+
+  try {
+    if (CURRENT_PROVIDER === 'DEEPSEEK') {
+      console.log('Using DeepSeek for Deep Reflection...');
+      const result = await callDeepSeekText(systemPrompt, userPrompt);
+      return result.trim();
+    } else {
+      throw new Error('Gemini provider not configured. Please use DEEPSEEK.');
+    }
+  } catch (error) {
+    console.error(`Deep reflection generation failed (${CURRENT_PROVIDER}):`, error);
+    throw new Error('AI 深度回看生成失败，请稍后重试');
   }
 };
 

@@ -1,0 +1,301 @@
+import React, { useState, useEffect, useRef } from 'react';
+import { DiaryEntry } from '../types';
+import { ICONS } from '../constants';
+import { databaseService } from '../services/databaseService';
+import { generateDailyDeepReflection } from '../services/geminiService';
+import DailyNoteEditor from './DailyNoteEditor';
+
+interface Props {
+  selectedDate: Date;
+  moodEntries: DiaryEntry[];
+}
+
+const DeepReflectionSection: React.FC<Props> = ({ selectedDate, moodEntries }) => {
+  const [isExpanded, setIsExpanded] = useState(false);
+  const [journalContent, setJournalContent] = useState('');
+  const [deepReflection, setDeepReflection] = useState('');
+  const [deepReflectionSource, setDeepReflectionSource] = useState<'journal-only' | 'journal-with-moods'>('journal-only');
+  const [isReflectionCollapsed, setIsReflectionCollapsed] = useState(true);
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [showSourceDialog, setShowSourceDialog] = useState(false);
+  const [error, setError] = useState('');
+  const debounceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  const dateStr = selectedDate.toLocaleDateString('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit' }).replace(/\//g, '-');
+
+  // Load journal and deep reflection when date changes
+  useEffect(() => {
+    loadJournalData();
+  }, [dateStr]);
+
+  // Restore expansion state from localStorage
+  useEffect(() => {
+    const savedState = localStorage.getItem('deepReflectionExpanded');
+    if (savedState !== null) {
+      setIsExpanded(JSON.parse(savedState));
+    }
+  }, []);
+
+  const loadJournalData = async () => {
+    try {
+      const note = await databaseService.getDailyNote(dateStr);
+      if (note) {
+        setJournalContent(note.content || '');
+        setDeepReflection(note.deepReflection || '');
+        setDeepReflectionSource(note.deepReflectionSource || 'journal-only');
+        setIsReflectionCollapsed(true); // Always collapse when loading new date
+      } else {
+        setJournalContent('');
+        setDeepReflection('');
+        setDeepReflectionSource('journal-only');
+      }
+      setError('');
+    } catch (err) {
+      console.error('Failed to load journal:', err);
+    }
+  };
+
+  const handleJournalSave = async (date: string, content: string) => {
+    setJournalContent(content);
+
+    // Auto-save with debounce
+    if (debounceTimeoutRef.current) {
+      clearTimeout(debounceTimeoutRef.current);
+    }
+
+    debounceTimeoutRef.current = setTimeout(async () => {
+      try {
+        await databaseService.saveDailyNote(date, content);
+        // Clear deep reflection when journal content changes
+        if (deepReflection) {
+          await databaseService.clearDeepReflection(date);
+          setDeepReflection('');
+        }
+      } catch (err) {
+        console.error('Failed to save journal:', err);
+      }
+    }, 500);
+  };
+
+  const handleGenerateClick = () => {
+    if (!journalContent.trim()) {
+      setError('请先写入日记内容');
+      return;
+    }
+    setShowSourceDialog(true);
+    setError('');
+  };
+
+  const handleGenerate = async (source: 'journal-only' | 'journal-with-moods') => {
+    setShowSourceDialog(false);
+    setIsGenerating(true);
+    setError('');
+
+    try {
+      const result = await generateDailyDeepReflection(journalContent, moodEntries, source);
+      setDeepReflection(result);
+      setDeepReflectionSource(source);
+      setIsReflectionCollapsed(true);
+
+      // Save to database
+      await databaseService.updateDeepReflection(dateStr, result, source);
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : '生成失败，请稍后重试';
+      setError(errorMessage);
+      console.error('Deep reflection generation failed:', err);
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
+  const toggleExpanded = () => {
+    const newState = !isExpanded;
+    setIsExpanded(newState);
+    localStorage.setItem('deepReflectionExpanded', JSON.stringify(newState));
+  };
+
+  const toggleReflectionCollapse = () => {
+    setIsReflectionCollapsed(!isReflectionCollapsed);
+  };
+
+  const handleRegenerate = () => {
+    setShowSourceDialog(true);
+  };
+
+  return (
+    <div className="glass-card rounded-[32px] p-4 mb-4">
+      {/* Header: 深度回看 + 折叠按钮 */}
+      <div
+        className="flex items-center justify-between cursor-pointer"
+        onClick={toggleExpanded}
+      >
+        <div className="flex items-center gap-2">
+          <span className="text-lg">📖</span>
+          <h3 className="text-sm font-bold text-gray-700">深度回看</h3>
+        </div>
+        <svg
+          className={`w-4 h-4 text-gray-400 transition-transform duration-200 ${
+            isExpanded ? 'rotate-180' : 'rotate-0'
+          }`}
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2}
+            d="M19 14l-7 7m0 0l-7-7m7 7V3"
+          />
+        </svg>
+      </div>
+
+      {/* Expanded Content */}
+      {isExpanded && (
+        <div className="mt-4 space-y-4">
+          {/* 日记编辑器 */}
+          <DailyNoteEditor
+            dateStr={dateStr}
+            initialContent={journalContent}
+            onSave={handleJournalSave}
+          />
+
+          {/* 生成分析按钮 */}
+          <button
+            onClick={handleGenerateClick}
+            disabled={!journalContent.trim() || isGenerating}
+            className={`w-full py-2.5 px-4 rounded-xl font-semibold text-white transition-all ${
+              isGenerating
+                ? 'bg-gray-300 cursor-not-allowed'
+                : !journalContent.trim()
+                ? 'bg-gray-300 cursor-not-allowed'
+                : deepReflection
+                ? 'bg-indigo-600 hover:bg-indigo-700'
+                : 'bg-indigo-600 hover:bg-indigo-700'
+            }`}
+          >
+            {isGenerating ? (
+              <span className="flex items-center justify-center gap-2">
+                <svg className="w-4 h-4 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                </svg>
+                生成中...
+              </span>
+            ) : deepReflection ? (
+              '重新生成深度回看'
+            ) : (
+              '生成深度回看'
+            )}
+          </button>
+
+          {/* Error Message */}
+          {error && (
+            <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
+              <p className="text-sm text-red-700">{error}</p>
+            </div>
+          )}
+
+          {/* AI 深度回看结果卡片（折叠式） */}
+          {deepReflection && (
+            <div
+              className="border-l-4 border-indigo-400 bg-indigo-50 rounded-lg p-4 cursor-pointer transition-all hover:shadow-md"
+              onClick={toggleReflectionCollapse}
+            >
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-sm font-bold text-indigo-700">💡 智者建议</span>
+                <svg
+                  className={`w-4 h-4 text-indigo-600 transition-transform duration-200 ${
+                    isReflectionCollapsed ? 'rotate-180' : 'rotate-0'
+                  }`}
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M19 14l-7 7m0 0l-7-7m7 7V3"
+                  />
+                </svg>
+              </div>
+
+              {isReflectionCollapsed ? (
+                // 预览前2-3行
+                <p className="text-sm text-gray-700 line-clamp-3">{deepReflection}</p>
+              ) : (
+                // 完整内容
+                <div className="space-y-3">
+                  <p className="text-sm text-gray-700 whitespace-pre-wrap leading-relaxed">
+                    {deepReflection}
+                  </p>
+                  <div className="flex justify-end pt-2">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleRegenerate();
+                      }}
+                      className="text-xs text-indigo-600 hover:text-indigo-700 hover:underline font-semibold flex items-center gap-1"
+                    >
+                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+                        />
+                      </svg>
+                      重新生成
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Source Selection Dialog */}
+      {showSourceDialog && (
+        <div className="fixed inset-0 bg-black/50 flex items-end sm:items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl p-6 w-full max-w-sm shadow-lg animate-in slide-in-from-bottom-8">
+            <h3 className="text-lg font-bold text-gray-800 mb-4">选择分析来源</h3>
+            <div className="space-y-3">
+              {/* 仅日记 */}
+              <button
+                onClick={() => handleGenerate('journal-only')}
+                className="w-full p-4 border-2 border-gray-200 rounded-xl hover:border-indigo-400 hover:bg-indigo-50 transition-all text-left"
+              >
+                <div className="font-semibold text-gray-800">📝 仅日记</div>
+                <div className="text-sm text-gray-500 mt-1">只分析今天的日记内容</div>
+              </button>
+
+              {/* 日记 + 心情记录 */}
+              <button
+                onClick={() => handleGenerate('journal-with-moods')}
+                className="w-full p-4 border-2 border-indigo-400 bg-indigo-50 rounded-xl hover:border-indigo-600 transition-all text-left"
+              >
+                <div className="font-semibold text-indigo-700">
+                  📝+😊 日记 + 心情记录
+                </div>
+                <div className="text-sm text-indigo-600 mt-1">
+                  包含今天的 {moodEntries.length} 条心情记录
+                </div>
+              </button>
+            </div>
+
+            {/* 取消按钮 */}
+            <button
+              onClick={() => setShowSourceDialog(false)}
+              className="w-full mt-4 p-2.5 text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-lg transition-colors font-medium"
+            >
+              取消
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default DeepReflectionSection;
