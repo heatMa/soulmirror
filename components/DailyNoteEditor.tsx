@@ -77,87 +77,87 @@ const DailyNoteEditor: React.FC<Props> = ({
 
   return (
     <div className="glass-card rounded-[2rem] p-5 relative overflow-hidden transition-all focus-within:ring-1 focus-within:ring-indigo-100 flex flex-col gap-3">
-      {/* 顶部工具栏：标题 + 格式化按钮 + 生成按钮 + 撤销 */}
-      <div className="flex justify-between items-center px-1 border-b border-gray-100/80 pb-3">
-         <div className="flex items-center gap-2">
-             <span className="text-gray-400"><ICONS.Pen /></span>
-             <h4 className="text-sm font-bold text-gray-600">日记</h4>
-         </div>
-         <div className="flex items-center gap-1">
-             {/* 生成深度回看按钮 */}
-             {onGenerateClick && (
-               <>
-                 <button
-                   onClick={(e) => {
-                     e.stopPropagation();
-                     onGenerateClick();
-                   }}
-                   disabled={!canGenerate || isGenerating}
-                   title={!canGenerate ? '请先记录今日心情或写日记' : ''}
-                   className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1 ${
-                     isGenerating
-                       ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                       : !canGenerate
-                       ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
-                       : 'bg-indigo-600 text-white hover:bg-indigo-700 active:scale-95'
-                   }`}
-                 >
-                   {isGenerating ? (
-                     <>
-                       <svg className="w-3 h-3 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                       </svg>
-                       生成中
-                     </>
-                   ) : hasDeepReflection ? (
-                     <>
-                       <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                       </svg>
-                       重新生成
-                     </>
-                   ) : (
-                     <>
-                       <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
-                       </svg>
-                       生成深度回看
-                     </>
-                   )}
-                 </button>
-                 <div className="w-[1px] h-4 bg-gray-200 mx-1"></div>
-               </>
-             )}
-             <button
-                onClick={() => executeCommand('undo')}
-                className="p-1.5 text-emerald-500 hover:bg-emerald-50 rounded-lg transition-colors"
-                title="撤销"
-             >
-                 <ICONS.Undo />
-             </button>
-             <div className="w-[1px] h-4 bg-gray-200 mx-1"></div>
-             <button
-                onClick={() => executeCommand('bold')}
-                className="p-1.5 text-gray-400 hover:text-gray-800 hover:bg-gray-100 rounded-lg transition-colors"
-                title="加粗"
-             >
-                 <ICONS.Bold />
-             </button>
-             <button
-                onClick={() => executeCommand('italic')}
-                className="p-1.5 text-gray-400 hover:text-gray-800 hover:bg-gray-100 rounded-lg transition-colors"
-                title="斜体"
-             >
-                 <ICONS.Italic />
-             </button>
-             <button
-                onClick={() => executeCommand('insertUnorderedList')}
-                className="p-1.5 text-gray-400 hover:text-gray-800 hover:bg-gray-100 rounded-lg transition-colors"
-                title="列表"
-             >
-                 <ICONS.List />
-             </button>
-         </div>
+      {/* 顶部标题行 */}
+      <div className="flex items-center gap-2 px-1 pb-2">
+          <span className="text-gray-400"><ICONS.Pen /></span>
+          <h4 className="text-xs font-bold text-gray-600">日记</h4>
+      </div>
+
+      {/* 工具栏：生成按钮 + 格式化按钮 */}
+      <div className="flex items-center gap-1 px-1 border-b border-gray-100/80 pb-2">
+          {/* AI洞察按钮 */}
+          {onGenerateClick && (
+            <>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onGenerateClick();
+                }}
+                disabled={!canGenerate || isGenerating}
+                title={!canGenerate ? '请先记录今日心情或写日记' : ''}
+                className={`px-2 py-1 rounded-lg text-[11px] font-semibold transition-all flex items-center gap-1 ${
+                  isGenerating
+                    ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                    : !canGenerate
+                    ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                    : 'bg-indigo-600 text-white hover:bg-indigo-700 active:scale-95'
+                }`}
+              >
+                {isGenerating ? (
+                  <>
+                    <svg className="w-2.5 h-2.5 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                    </svg>
+                    生成中
+                  </>
+                ) : hasDeepReflection ? (
+                  <>
+                    <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                    </svg>
+                    重新生成
+                  </>
+                ) : (
+                  <>
+                    <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+                    </svg>
+                    AI洞察
+                  </>
+                )}
+              </button>
+              <div className="w-[1px] h-3 bg-gray-200"></div>
+            </>
+          )}
+          <button
+              onClick={() => executeCommand('undo')}
+              className="p-1 text-emerald-500 hover:bg-emerald-50 rounded-lg transition-colors"
+              title="撤销"
+          >
+              <ICONS.Undo />
+          </button>
+          <div className="w-[1px] h-3 bg-gray-200"></div>
+          <button
+              onClick={() => executeCommand('bold')}
+              className="p-1 text-gray-400 hover:text-gray-800 hover:bg-gray-100 rounded-lg transition-colors"
+              title="加粗"
+          >
+              <ICONS.Bold />
+          </button>
+          <button
+              onClick={() => executeCommand('italic')}
+              className="p-1 text-gray-400 hover:text-gray-800 hover:bg-gray-100 rounded-lg transition-colors"
+              title="斜体"
+          >
+              <ICONS.Italic />
+          </button>
+          <button
+              onClick={() => executeCommand('insertUnorderedList')}
+              className="p-1 text-gray-400 hover:text-gray-800 hover:bg-gray-100 rounded-lg transition-colors"
+              title="列表"
+          >
+              <ICONS.List />
+          </button>
       </div>
 
       {/* 颜色选择栏 (水平滚动) */}
