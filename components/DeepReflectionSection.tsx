@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { marked } from 'marked';
 import { DiaryEntry } from '../types';
 import { ICONS } from '../constants';
 import { databaseService } from '../services/databaseService';
@@ -222,14 +223,21 @@ const DeepReflectionSection: React.FC<Props> = ({ selectedDate, moodEntries }) =
               </div>
 
               {isReflectionCollapsed ? (
-                // 预览前2-3行
-                <p className="text-sm text-gray-700 line-clamp-3">{deepReflection}</p>
+                // 预览前2-3行（纯文本，去掉Markdown符号）
+                <p className="text-sm text-gray-700 line-clamp-3">
+                  {deepReflection.replace(/[#*_`]/g, '').replace(/\n+/g, ' ')}
+                </p>
               ) : (
-                // 完整内容
+                // 完整内容（Markdown渲染）
                 <div className="space-y-3">
-                  <p className="text-sm text-gray-700 whitespace-pre-wrap leading-relaxed">
-                    {deepReflection}
-                  </p>
+                  <div
+                    className="prose prose-sm prose-indigo max-w-none text-gray-700 leading-relaxed
+                      [&_h3]:text-sm [&_h3]:font-bold [&_h3]:text-indigo-800 [&_h3]:mt-3 [&_h3]:mb-2
+                      [&_p]:text-sm [&_p]:my-2
+                      [&_strong]:text-indigo-700
+                      [&_ul]:my-2 [&_ul]:pl-4 [&_li]:text-sm [&_li]:my-1"
+                    dangerouslySetInnerHTML={{ __html: marked.parse(deepReflection) as string }}
+                  />
                   <div className="flex justify-end pt-2">
                     <button
                       onClick={(e) => {
