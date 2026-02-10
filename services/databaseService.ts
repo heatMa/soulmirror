@@ -30,7 +30,10 @@ CREATE TABLE IF NOT EXISTS diary_entries (
 
 CREATE TABLE IF NOT EXISTS daily_notes (
   date_str TEXT PRIMARY KEY,
-  content TEXT NOT NULL
+  content TEXT NOT NULL,
+  deep_reflection TEXT,
+  deep_reflection_source TEXT,
+  deep_reflection_timestamp INTEGER
 );
 
 CREATE TABLE IF NOT EXISTS custom_moods (
@@ -156,6 +159,28 @@ class DatabaseService {
           value TEXT NOT NULL
         )
       `);
+
+      // 检查 daily_notes 表是否有深度回看相关列
+      const notesTableInfo = await this.db.query("PRAGMA table_info(daily_notes)");
+      const notesColumns = notesTableInfo.values || [];
+      const hasDeepReflection = notesColumns.some((col: any) => col.name === 'deep_reflection');
+      const hasDeepReflectionSource = notesColumns.some((col: any) => col.name === 'deep_reflection_source');
+      const hasDeepReflectionTimestamp = notesColumns.some((col: any) => col.name === 'deep_reflection_timestamp');
+
+      if (!hasDeepReflection) {
+        await this.db.execute('ALTER TABLE daily_notes ADD COLUMN deep_reflection TEXT');
+        console.log('数据库迁移：添加 deep_reflection 列');
+      }
+
+      if (!hasDeepReflectionSource) {
+        await this.db.execute('ALTER TABLE daily_notes ADD COLUMN deep_reflection_source TEXT');
+        console.log('数据库迁移：添加 deep_reflection_source 列');
+      }
+
+      if (!hasDeepReflectionTimestamp) {
+        await this.db.execute('ALTER TABLE daily_notes ADD COLUMN deep_reflection_timestamp INTEGER');
+        console.log('数据库迁移：添加 deep_reflection_timestamp 列');
+      }
     } catch (error) {
       console.error('数据库迁移失败:', error);
     }
@@ -328,31 +353,53 @@ class DatabaseService {
   // ==================== 每日笔记操作 ====================
 
   /**
-   * 获取指定日期的笔记
+   * 获取指定日期的笔记（返回完整日记对象）
    */
-  async getDailyNote(dateStr: string): Promise<string> {
+  async getDailyNote(dateStr: string): Promise<any> {
     await this.ensureInitialized();
 
     if (this.isNative && this.db) {
-      const result = await this.db.query('SELECT content FROM daily_notes WHERE date_str = ?', [dateStr]);
-      return result.values?.[0]?.content as string || '';
+      const result = await this.db.query('SELECT * FROM daily_notes WHERE date_str = ?', [dateStr]);
+      const row = result.values?.[0];
+      if (!row) return null;
+      return {
+        date: dateStr,
+        content: row.content as string,
+        deepReflection: row.deep_reflection as string | undefined,
+        deepReflectionSource: row.deep_reflection_source as string | undefined,
+        deepReflectionTimestamp: row.deep_reflection_timestamp as number | undefined
+      };
     } else {
       const notes = await this.getAllDailyNotes();
-      return notes[dateStr] || '';
+      return notes[dateStr] || null;
     }
+  }
+
+  /**
+   * 获取指定日期的笔记文本（兼容旧接口）
+   */
+  async getDailyNoteText(dateStr: string): Promise<string> {
+    const note = await this.getDailyNote(dateStr);
+    return note?.content || '';
   }
 
   /**
    * 获取所有每日笔记
    */
-  async getAllDailyNotes(): Promise<Record<string, string>> {
+  async getAllDailyNotes(): Promise<Record<string, any>> {
     await this.ensureInitialized();
 
     if (this.isNative && this.db) {
-      const result = await this.db.query('SELECT date_str, content FROM daily_notes');
-      const notes: Record<string, string> = {};
+      const result = await this.db.query('SELECT * FROM daily_notes');
+      const notes: Record<string, any> = {};
       (result.values || []).forEach(row => {
-        notes[row.date_str as string] = row.content as string;
+        notes[row.date_str as string] = {
+          date: row.date_str as string,
+          content: row.content as string,
+          deepReflection: row.deep_reflection as string | undefined,
+          deepReflectionSource: row.deep_reflection_source as string | undefined,
+          deepReflectionTimestamp: row.deep_reflection_timestamp as number | undefined
+        };
       });
       return notes;
     } else {
@@ -374,8 +421,68 @@ class DatabaseService {
       );
     } else {
       const notes = await this.getAllDailyNotes();
-      notes[dateStr] = content;
+      // 如果已存在该日期的笔记，保留深度回看数据
+      const existingNote = notes[dateStr];
+      notes[dateStr] = {
+        date: dateStr,
+        content,
+        deepReflection: existingNote?.deepReflection,
+        deepReflectionSource: existingNote?.deepReflectionSource,
+        deepReflectionTimestamp: existingNote?.deepReflectionTimestamp
+      };
       localStorage.setItem(STORAGE_KEYS.NOTES, JSON.stringify(notes));
+    }
+  }
+
+  /**
+   * 更新深度回看内容
+   */
+  async updateDeepReflection(
+    dateStr: string,
+    deepReflection: string,
+    source: 'journal-only' | 'journal-with-moods'
+  ): Promise<void> {
+    await this.ensureInitialized();
+
+    if (this.isNative && this.db) {
+      await this.db.run(
+        `UPDATE daily_notes
+         SET deep_reflection = ?, deep_reflection_source = ?, deep_reflection_timestamp = ?
+         WHERE date_str = ?`,
+        [deepReflection, source, Date.now(), dateStr]
+      );
+    } else {
+      const notes = await this.getAllDailyNotes();
+      if (notes[dateStr]) {
+        notes[dateStr].deepReflection = deepReflection;
+        notes[dateStr].deepReflectionSource = source;
+        notes[dateStr].deepReflectionTimestamp = Date.now();
+        localStorage.setItem(STORAGE_KEYS.NOTES, JSON.stringify(notes));
+      }
+    }
+  }
+
+  /**
+   * 清空深度回看内容（编辑日记时自动调用）
+   */
+  async clearDeepReflection(dateStr: string): Promise<void> {
+    await this.ensureInitialized();
+
+    if (this.isNative && this.db) {
+      await this.db.run(
+        `UPDATE daily_notes
+         SET deep_reflection = NULL, deep_reflection_source = NULL, deep_reflection_timestamp = NULL
+         WHERE date_str = ?`,
+        [dateStr]
+      );
+    } else {
+      const notes = await this.getAllDailyNotes();
+      if (notes[dateStr]) {
+        delete notes[dateStr].deepReflection;
+        delete notes[dateStr].deepReflectionSource;
+        delete notes[dateStr].deepReflectionTimestamp;
+        localStorage.setItem(STORAGE_KEYS.NOTES, JSON.stringify(notes));
+      }
     }
   }
 

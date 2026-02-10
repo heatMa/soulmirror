@@ -8,6 +8,7 @@ import DailyMoodChart from './components/DailyMoodChart';
 import EnergyBattery from './components/EnergyBattery';
 import WeeklyGoal from './components/WeeklyGoal';
 import TimelineItem from './components/TimelineItem';
+import DeepReflectionSection from './components/DeepReflectionSection';
 import Statistics from './components/Statistics';
 import { ICONS, MOOD_OPTIONS, MoodOption } from './constants';
 import { evaluateMoodScore, generateAiReply, generateRegulationSuggestions } from './services/geminiService';
@@ -438,6 +439,14 @@ const App: React.FC = () => {
                  <DailyMoodChart entries={timelineEntries} customMoods={customMoods} />
               </div>
             )}
+
+            {/* Deep Reflection Section */}
+            <div className="mb-4 animate-in fade-in slide-in-from-bottom-6 duration-700">
+               <DeepReflectionSection
+                 selectedDate={selectedDate}
+                 moodEntries={timelineEntries}
+               />
+            </div>
 
             {/* Weekly Goal */}
             <div className="mb-4 animate-in fade-in slide-in-from-bottom-5 duration-700">
