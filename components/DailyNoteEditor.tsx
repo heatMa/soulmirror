@@ -77,12 +77,6 @@ const DailyNoteEditor: React.FC<Props> = ({
 
   return (
     <div className="glass-card rounded-[2rem] p-5 relative overflow-hidden transition-all focus-within:ring-1 focus-within:ring-indigo-100 flex flex-col gap-3">
-      {/* 顶部标题行 */}
-      <div className="flex items-center gap-2 px-1 pb-2">
-          <span className="text-gray-400"><ICONS.Pen /></span>
-          <h4 className="text-xs font-bold text-gray-600">日记</h4>
-      </div>
-
       {/* 工具栏：生成按钮 + 格式化按钮 */}
       <div className="flex items-center gap-1 px-1 border-b border-gray-100/80 pb-2">
           {/* AI洞察按钮 */}
@@ -180,14 +174,24 @@ const DailyNoteEditor: React.FC<Props> = ({
          ))}
       </div>
 
-      <div
-        ref={contentRef}
-        contentEditable
-        onInput={handleInput}
-        className="w-full min-h-[120px] max-h-[300px] overflow-y-auto outline-none text-sm text-gray-700 leading-relaxed tracking-wide px-1 empty:before:content-[attr(data-placeholder)] empty:before:text-gray-300"
-        data-placeholder="写下今天的碎碎念..."
-        style={{ whiteSpace: 'pre-wrap' }}
-      />
+      {/* 日记标题 + 输入区域在同一行 */}
+      <div className="flex gap-2">
+        {/* 左侧：日记图标和标题 */}
+        <div className="flex flex-col items-center pt-1 flex-shrink-0">
+          <span className="text-gray-400"><ICONS.Pen /></span>
+          <span className="text-[10px] font-bold text-gray-500 mt-0.5">日记</span>
+        </div>
+
+        {/* 右侧：输入区域 */}
+        <div
+          ref={contentRef}
+          contentEditable
+          onInput={handleInput}
+          className="flex-1 min-h-[120px] max-h-[300px] overflow-y-auto outline-none text-sm text-gray-700 leading-relaxed tracking-wide empty:before:content-[attr(data-placeholder)] empty:before:text-gray-300"
+          data-placeholder="写下今天的碎碎念..."
+          style={{ whiteSpace: 'pre-wrap' }}
+        />
+      </div>
       
       <div className="absolute bottom-3 right-4 pointer-events-none">
         {status === 'saving' && <span className="text-[10px] text-gray-400 animate-pulse">保存中...</span>}
