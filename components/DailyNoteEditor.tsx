@@ -42,9 +42,7 @@ const DailyNoteEditor: React.FC<Props> = ({
   // 初始化内容。注意：仅在 dateStr 变化时重置，避免输入时光标跳动
   useEffect(() => {
     if (contentRef.current) {
-      if (contentRef.current.innerHTML !== initialContent) {
-          contentRef.current.innerHTML = initialContent || '';
-      }
+      contentRef.current.innerHTML = initialContent || '';
     }
   }, [dateStr]); // 不依赖 initialContent，防止循环更新
 
