@@ -3,6 +3,7 @@ import React, { useState, useRef } from 'react';
 import { DiaryEntry } from '../types';
 import { MoodOption, ICONS, getHexFromTailwind } from '../constants';
 import { getEntryDurationDisplay } from '../utils/timeUtils';
+import { formatEnergyDisplay } from '../utils/energyUtils';
 
 interface Props {
   entry: DiaryEntry;
@@ -14,6 +15,7 @@ interface Props {
   countToday: number;
   countWeek: number;
   countMonth: number;
+  energyRemaining?: number; // 该条记录后的剩余电量
 }
 
 const TimelineItem: React.FC<Props> = ({
@@ -26,6 +28,7 @@ const TimelineItem: React.FC<Props> = ({
   countToday,
   countWeek,
   countMonth,
+  energyRemaining,
 }) => {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [swipeOffset, setSwipeOffset] = useState(0);
@@ -215,9 +218,14 @@ const TimelineItem: React.FC<Props> = ({
                 <span className="text-sm font-medium text-gray-400 font-mono tracking-tight">
                   {timeString}
                 </span>
-                {entry.moodScore > 0 && (
+                {entry.energyDelta !== undefined && energyRemaining !== undefined && (
+                  <span className="text-sm font-bold" style={{ color: entry.energyDelta >= 0 ? '#10b981' : '#f43f5e' }}>
+                    {formatEnergyDisplay(entry.energyDelta, energyRemaining)}
+                  </span>
+                )}
+                {entry.energyDelta === undefined && entry.moodScore > 0 && (
                   <span className="text-sm font-bold" style={{ color: moodHexColor }}>
-                    {entry.moodScore.toFixed(1)}分
+                    {entry.moodScore.toFixed(1)}分（旧系统）
                   </span>
                 )}
               </div>

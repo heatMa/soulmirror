@@ -1,24 +1,25 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { DiaryEntry } from '../types';
+import { getWeeklyEnergyData, getTodayFinalEnergy, DAILY_STARTING_ENERGY } from '../utils/energyUtils';
 
 interface Props {
   entries: DiaryEntry[];  // 所有条目
 }
 
 interface WeeklyGoalData {
-  targetScore: number;  // 目标平均分
-  enabled: boolean;     // 是否启用目标
+  targetEnergy: number;  // 目标平均电量
+  enabled: boolean;      // 是否启用目标
 }
 
 const STORAGE_KEY = 'soulmirror_weekly_goal';
 
 const WeeklyGoal: React.FC<Props> = ({ entries }) => {
   const [goalData, setGoalData] = useState<WeeklyGoalData>({
-    targetScore: 6,
+    targetEnergy: 70,
     enabled: true
   });
   const [isEditing, setIsEditing] = useState(false);
-  const [tempTarget, setTempTarget] = useState(6);
+  const [tempTarget, setTempTarget] = useState(70);
 
   // 加载目标设置
   useEffect(() => {
@@ -53,44 +54,51 @@ const WeeklyGoal: React.FC<Props> = ({ entries }) => {
     // 筛选本周条目
     const weekEntries = entries.filter(e => e.timestamp >= weekStart.getTime());
 
-    // 计算有记录的天数
-    const daysWithEntries = new Set<string>();
-    weekEntries.forEach(entry => {
-      const dateStr = new Date(entry.timestamp).toLocaleDateString('zh-CN');
-      daysWithEntries.add(dateStr);
-    });
+    // 获取过去一周每天的电量数据
+    const weeklyData = getWeeklyEnergyData(weekEntries);
+    const daysWithData = weeklyData.filter(d => d.hasData);
 
-    // 计算平均分
-    const scoresOnly = weekEntries.filter(e => e.moodScore > 0);
-    const avgScore = scoresOnly.length > 0
-      ? scoresOnly.reduce((sum, e) => sum + e.moodScore, 0) / scoresOnly.length
-      : 0;
+    // 计算平均电量
+    const avgEnergy = daysWithData.length > 0
+      ? daysWithData.reduce((sum, d) => sum + d.energy, 0) / daysWithData.length
+      : DAILY_STARTING_ENERGY;
+
+    // 今日电量
+    const today = new Date();
+    const todayEntries = entries.filter(e => {
+      const eDate = new Date(e.timestamp);
+      return eDate.getDate() === today.getDate() &&
+             eDate.getMonth() === today.getMonth() &&
+             eDate.getFullYear() === today.getFullYear();
+    });
+    const todayEnergy = todayEntries.length > 0 ? getTodayFinalEnergy(todayEntries) : DAILY_STARTING_ENERGY;
 
     // 计算本周已过天数（包括今天）
     const daysPassed = diff + 1;
 
     return {
       totalEntries: weekEntries.length,
-      daysRecorded: daysWithEntries.size,
+      daysRecorded: daysWithData.length,
       daysPassed,
-      avgScore,
-      hasData: scoresOnly.length > 0
+      avgEnergy,
+      todayEnergy,
+      hasData: daysWithData.length > 0
     };
   }, [entries]);
 
   // 计算进度百分比
   const progress = useMemo(() => {
     if (!weekStats.hasData) return 0;
-    const ratio = weekStats.avgScore / goalData.targetScore;
+    const ratio = weekStats.avgEnergy / goalData.targetEnergy;
     return Math.min(100, Math.round(ratio * 100));
-  }, [weekStats, goalData.targetScore]);
+  }, [weekStats, goalData.targetEnergy]);
 
   // 是否达成目标
-  const isGoalMet = weekStats.avgScore >= goalData.targetScore && weekStats.hasData;
+  const isGoalMet = weekStats.avgEnergy >= goalData.targetEnergy && weekStats.hasData;
 
   // 处理保存
   const handleSave = () => {
-    saveGoal({ ...goalData, targetScore: tempTarget });
+    saveGoal({ ...goalData, targetEnergy: tempTarget });
     setIsEditing(false);
   };
 
@@ -123,11 +131,11 @@ const WeeklyGoal: React.FC<Props> = ({ entries }) => {
             <input
               type="number"
               value={tempTarget}
-              onChange={(e) => setTempTarget(Math.max(1, Math.min(10, Number(e.target.value))))}
+              onChange={(e) => setTempTarget(Math.max(0, Math.min(150, Number(e.target.value))))}
               className="w-12 px-2 py-1 text-xs text-center border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-gray-400"
-              min="1"
-              max="10"
-              step="0.5"
+              min="0"
+              max="150"
+              step="5"
             />
             <span className="text-xs text-gray-400">分</span>
             <button
@@ -146,11 +154,11 @@ const WeeklyGoal: React.FC<Props> = ({ entries }) => {
         ) : (
           <div className="flex items-center gap-2">
             <span className="text-xs text-gray-500">
-              平均分 ≥ {goalData.targetScore}
+              目标电量: {goalData.targetEnergy}分
             </span>
             <button
               onClick={() => {
-                setTempTarget(goalData.targetScore);
+                setTempTarget(goalData.targetEnergy);
                 setIsEditing(true);
               }}
               className="text-xs text-gray-400 hover:text-gray-600"
@@ -188,16 +196,16 @@ const WeeklyGoal: React.FC<Props> = ({ entries }) => {
           {weekStats.hasData ? (
             <>
               <span className={`font-bold ${isGoalMet ? 'text-green-600' : 'text-amber-600'}`}>
-                {weekStats.avgScore.toFixed(1)}
+                平均: {weekStats.avgEnergy.toFixed(0)}
               </span>
-              <span className="text-gray-400">/ {goalData.targetScore} 分</span>
+              <span className="text-gray-400">/ {goalData.targetEnergy} 分</span>
             </>
           ) : (
-            <span className="text-gray-400">暂无评分数据</span>
+            <span className="text-gray-400">暂无电量数据</span>
           )}
         </div>
         <div className="text-gray-400">
-          已记录 {weekStats.daysRecorded}/{weekStats.daysPassed} 天
+          今日: {Math.round(weekStats.todayEnergy)} | 已记录 {weekStats.daysRecorded}/{weekStats.daysPassed} 天
         </div>
       </div>
 

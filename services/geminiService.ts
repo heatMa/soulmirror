@@ -155,15 +155,21 @@ export const generateMoodMetadata = async (moodLabel: string): Promise<Partial<M
       "emoji": "最能代表这个心情的 emoji",
       "color": "Tailwind CSS 背景颜色类名 (如 bg-emerald-500, bg-rose-500)",
       "hexColor": "对应的 hex 颜色值 (如 #10b981, #f43f5e)",
-      "score": 1-10 的整数评分
+      "score": -10 到 +10 的整数评分（新能量系统）
     }
 
     颜色规则:
     - 正面/平静 -> 绿色、青色、蓝绿色系 (bg-emerald-500/#10b981, bg-teal-500/#14b8a6, bg-sky-400/#38bdf8)
     - 负面/激烈 -> 紫色、黄色、红色系 (bg-purple-500/#a855f7, bg-amber-500/#f59e0b, bg-rose-500/#f43f5e)
     - 中性/平淡 -> 灰色、蓝灰色系 (bg-slate-500/#64748b, bg-gray-400/#9ca3af)
-    评分规则:
-    - 1-4: 负面, 5-6: 中性, 7-10: 正面
+
+    评分规则（能量电池系统）:
+    - +8 ~ +10: 极度开心、狂喜
+    - +3 ~ +7: 愉快、满足、顺利
+    - +1 ~ +2: 平静、安稳
+    - -1 ~ -3: 轻微不适、小烦恼
+    - -4 ~ -6: 疲惫、焦虑、反刍
+    - -7 ~ -10: 难过、愤怒、严重内耗
   `;
 
   try {
@@ -181,11 +187,13 @@ export const generateMoodMetadata = async (moodLabel: string): Promise<Partial<M
     }
 
     const result = JSON.parse(cleanJsonString(jsonString));
+    // 确保分数在 -10 到 +10 范围内
+    const score = Math.max(-10, Math.min(10, result.score ?? 0));
     return {
       emoji: result.emoji || '🏷️',
       color: result.color || 'bg-slate-400',
       hexColor: result.hexColor || '#94a3b8',
-      score: result.score || 5
+      score: score
     };
   } catch (error) {
     console.error(`Failed to generate mood metadata (${CURRENT_PROVIDER}):`, error);
@@ -198,31 +206,44 @@ export const generateMoodMetadata = async (moodLabel: string): Promise<Partial<M
   }
 };
 
-export const evaluateMoodScore = async (mood: string, content: string): Promise<number> => {
+export const evaluateMoodScore = async (mood: string, content: string, presetScore: number = 0): Promise<number> => {
   const promptText = `
-    请根据用户的日记内容和心情标签，为用户当前的心情打分（1-10分）。
-    
+    请根据用户的日记内容和心情标签，为用户当前的心情评估能量变化值。
+
     心情标签: ${mood}
+    预设能量值: ${presetScore}
     日记内容: ${content}
 
-    评分标准参考：
-    1-2分：崩溃、愤怒、极度消极
-    3-4分：难过、焦虑、疲惫
-    5-6分：平静、安稳、无波澜
-    7-8分：开心、期待、顺利
-    9-10分：狂喜、极度兴奋、完美的一天
+    【能量电池系统说明】
+    - 每天用户起始能量为 100
+    - 正向情绪增加能量（正分），负向情绪消耗能量（负分）
+    - 范围：-10 到 +10
 
-    请返回 JSON 格式，格式为: { "score": 6.5 }
-    score 必须是数字。
+    【你的任务】
+    根据日记内容的具体描述，在预设分数基础上进行微调：
+    - 如果内容描述的情绪强度比标签更强烈，可以适当调整 1-2 分
+    - 如果内容比较轻描淡写，可以适当减轻 1-2 分
+    - 微调范围：预设分数 ± 2
+
+    【评分参考】
+    +8 ~ +10: 极度开心、狂喜
+    +3 ~ +7: 愉快、满足、顺利
+    +1 ~ +2: 平静、安稳
+    -1 ~ -3: 轻微不适、小烦恼
+    -4 ~ -6: 疲惫、焦虑、反刍
+    -7 ~ -10: 难过、愤怒、严重内耗
+
+    请返回 JSON 格式: { "score": 数值 }
+    score 必须是 -10 到 +10 之间的数字。
   `;
 
   try {
     let jsonString = "{}";
 
     if (CURRENT_PROVIDER === 'DEEPSEEK') {
-      console.log("Using DeepSeek for Scoring...");
+      console.log("Using DeepSeek for Energy Scoring...");
       jsonString = await callDeepSeek(
-        "你是一位细腻的情感分析师。请只返回 JSON。",
+        "你是一位细腻的情感分析师，擅长从文字中感受情绪强度。请只返回 JSON。",
         promptText
       );
     } else {
@@ -230,10 +251,12 @@ export const evaluateMoodScore = async (mood: string, content: string): Promise<
     }
 
     const result = JSON.parse(cleanJsonString(jsonString));
-    return result.score || 6;
+    // 确保返回值在 -10 到 +10 范围内
+    const score = Math.max(-10, Math.min(10, result.score ?? presetScore));
+    return score;
   } catch (error) {
-    console.error(`Mood evaluation failed (${CURRENT_PROVIDER}):`, error);
-    return 0;
+    console.error(`Energy evaluation failed (${CURRENT_PROVIDER}):`, error);
+    return presetScore; // 失败时返回预设分数
   }
 };
 

@@ -1,8 +1,9 @@
 
-import React, { useState, useEffect } from 'react';
-import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine, Scatter, ComposedChart } from 'recharts';
+import React, { useState, useEffect, useMemo } from 'react';
+import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine, Scatter, ComposedChart, Bar, Cell } from 'recharts';
 import { DiaryEntry } from '../types';
 import { MOOD_OPTIONS, MoodOption, getHexFromTailwind } from '../constants';
+import { calculateDailyEnergy, DAILY_STARTING_ENERGY } from '../utils/energyUtils';
 
 interface Props {
   entries: DiaryEntry[];
@@ -11,7 +12,8 @@ interface Props {
 
 interface ChartDataPoint {
   hour: number;
-  score: number | null;
+  energy: number | null; // 累计电量
+  delta?: number; // 本次能量变化
   mood?: string;
   content?: string;
   time?: string;
@@ -53,7 +55,7 @@ const saveTimeRange = (range: TimeRangeSettings) => {
 const CustomTooltip = ({ active, payload }: any) => {
   if (active && payload && payload.length) {
     const data = payload[0].payload;
-    if (data.score === null) return null;
+    if (data.energy === null) return null;
 
     return (
       <div className="bg-white/90 backdrop-blur-md px-3 py-2 rounded-xl shadow-lg border border-white/50 text-left z-50">
@@ -69,6 +71,14 @@ const CustomTooltip = ({ active, payload }: any) => {
         <p className="text-[10px] text-gray-600 line-clamp-1 max-w-[120px]">
             {data.content}
         </p>
+        <div className="text-[11px] font-mono text-gray-700 mt-1">
+          <span>剩余: {Math.round(data.energy)}分</span>
+          {data.delta !== undefined && (
+            <span className="ml-2" style={{ color: data.delta >= 0 ? '#10b981' : '#f43f5e' }}>
+              {data.delta >= 0 ? '+' : ''}{data.delta}分
+            </span>
+          )}
+        </div>
       </div>
     );
   }
@@ -78,7 +88,7 @@ const CustomTooltip = ({ active, payload }: any) => {
 // 自定义数据点组件
 const CustomDot = (props: any) => {
   const { cx, cy, payload } = props;
-  if (payload.score === null || cx === undefined || cy === undefined) return null;
+  if (payload.energy === null || cx === undefined || cy === undefined) return null;
 
   return (
     <circle
@@ -117,29 +127,55 @@ const DailyMoodChart: React.FC<Props> = ({ entries, customMoods = [] }) => {
 
   if (!entries || entries.length === 0) return null;
 
-  // 将条目转换为以小时为横轴的数据点
-  const entryPoints: ChartDataPoint[] = [...entries]
-    .sort((a, b) => a.timestamp - b.timestamp)
-    .map(e => {
-      const date = new Date(e.timestamp);
-      const hour = date.getHours() + date.getMinutes() / 60;
-      return {
-        hour,
-        score: e.moodScore,
-        mood: e.mood,
-        content: e.content,
-        time: date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        hexColor: getMoodHexColor(e.mood, e)
-      };
-    });
+  // 计算累计电量数据
+  const energyLevels = useMemo(() => calculateDailyEnergy(entries), [entries]);
+
+  // 将条目转换为图表数据点（包含累计电量）
+  const entryPoints: ChartDataPoint[] = useMemo(() => {
+    const points = [...entries]
+      .sort((a, b) => a.timestamp - b.timestamp)
+      .map((e, index) => {
+        const date = new Date(e.timestamp);
+        const hour = date.getHours() + date.getMinutes() / 60;
+        return {
+          hour,
+          energy: energyLevels[index],
+          delta: e.energyDelta ?? e.moodScore ?? 0,  // 确保 delta 始终有值
+          mood: e.mood,
+          content: e.content,
+          time: date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          hexColor: getMoodHexColor(e.mood, e)
+        };
+      });
+
+    // 调试：打印数据点信息
+    console.log('DailyMoodChart entryPoints:', points.map(p => ({
+      hour: p.hour,
+      delta: p.delta,
+      energy: p.energy
+    })));
+
+    return points;
+  }, [entries, energyLevels]);
 
   // 获取当前小时用于显示参考线
   const currentHour = new Date().getHours() + new Date().getMinutes() / 60;
 
-  // 计算当天情绪分数的平均值
-  const averageScore = entryPoints.length > 0
-    ? entryPoints.reduce((sum, point) => sum + (point.score || 0), 0) / entryPoints.length
-    : 0;
+  // 计算当天情绪电量的平均值
+  const averageEnergy = useMemo(() => {
+    if (entryPoints.length === 0) return DAILY_STARTING_ENERGY;
+    return entryPoints.reduce((sum, point) => sum + (point.energy || 0), 0) / entryPoints.length;
+  }, [entryPoints]);
+
+  // 计算图表的最大电量值（用于动态Y轴范围）
+  const maxEnergy = useMemo(() => {
+    if (entryPoints.length === 0) return DAILY_STARTING_ENERGY;
+    const max = Math.max(...entryPoints.map(p => p.energy || 0));
+    return Math.max(DAILY_STARTING_ENERGY, max + 10);
+  }, [entryPoints]);
+
+  // 右侧 Y 轴固定范围：-10 到 +10
+  const maxDelta = 10;
 
   // 生成横轴刻度
   const generateTicks = () => {
@@ -238,13 +274,8 @@ const DailyMoodChart: React.FC<Props> = ({ entries, customMoods = [] }) => {
 
       <div className="h-[calc(100%-1.5rem)] w-full -ml-2">
         <ResponsiveContainer width="100%" height="100%">
-          <ComposedChart data={entryPoints} margin={{ top: 5, right: 10, left: -20, bottom: 0 }}>
-            <defs>
-              <linearGradient id="colorScoreDaily" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor="#4f46e5" stopOpacity={0.15}/>
-                <stop offset="95%" stopColor="#4f46e5" stopOpacity={0}/>
-              </linearGradient>
-            </defs>
+          <ComposedChart data={entryPoints} margin={{ top: 5, right: 35, left: -20, bottom: 0 }}>
+            {/* 移除渐变色背景 */}
             <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(0,0,0,0.03)" />
             <XAxis
               dataKey="hour"
@@ -256,39 +287,93 @@ const DailyMoodChart: React.FC<Props> = ({ entries, customMoods = [] }) => {
               ticks={generateTicks()}
               tickFormatter={(value) => `${Math.floor(value)}:00`}
             />
+            {/* 左侧Y轴：累计能量 */}
             <YAxis
-              domain={[0, 10]}
+              yAxisId="left"
+              domain={[0, maxEnergy]}
               axisLine={false}
               tickLine={false}
               tick={{fontSize: 9, fill: '#9ca3af'}}
-              ticks={[0, 5, 10]}
+              ticks={[0, 50, 100, Math.round(maxEnergy)]}
+            />
+            {/* 右侧Y轴：能量变化量（固定范围 -10 到 +10） */}
+            <YAxis
+              yAxisId="right"
+              orientation="right"
+              domain={[-10, 10]}
+              axisLine={false}
+              tickLine={false}
+              tick={{fontSize: 9, fill: '#9ca3af'}}
+              ticks={[-10, -5, 0, 5, 10]}
+              width={35}
             />
             <ReferenceLine x={currentHour} stroke="#e5e7eb" strokeDasharray="3 3" />
-            {/* 平均分虚线 - 标签放左边只显示数字 */}
+            {/* 100分基准线（左轴） */}
             <ReferenceLine
-              y={averageScore}
+              yAxisId="left"
+              y={DAILY_STARTING_ENERGY}
+              stroke="#10b981"
+              strokeDasharray="6 4"
+              strokeWidth={1.5}
+              label={{
+                value: '100',
+                position: 'left',
+                fontSize: 9,
+                fill: '#10b981',
+                fontWeight: 'bold'
+              }}
+            />
+            {/* 平均电量虚线（左轴） */}
+            <ReferenceLine
+              yAxisId="left"
+              y={averageEnergy}
               stroke="#f43f5e"
               strokeDasharray="6 4"
               strokeWidth={1.5}
               label={{
-                value: averageScore.toFixed(1),
-                position: 'left',
+                value: `平均${averageEnergy.toFixed(0)}`,
+                position: 'right',
                 fontSize: 9,
                 fill: '#f43f5e',
                 fontWeight: 'bold'
               }}
             />
+            {/* 变化量的零线（右轴） */}
+            <ReferenceLine
+              yAxisId="right"
+              y={0}
+              stroke="rgba(0,0,0,0.1)"
+              strokeWidth={0.5}
+            />
             <Tooltip
                 content={<CustomTooltip />}
-                cursor={{ stroke: '#4f46e5', strokeWidth: 1, strokeDasharray: '4 4' }}
+                cursor={{ stroke: '#10b981', strokeWidth: 1, strokeDasharray: '4 4' }}
             />
+            {/* 能量变化柱状图（右轴，双向） - 先渲染在背景 */}
+            <Bar
+              yAxisId="right"
+              dataKey="delta"
+              animationDuration={800}
+              maxBarSize={24}
+              radius={[4, 4, 4, 4]}
+            >
+              {entryPoints.map((entry, index) => (
+                <Cell
+                  key={`cell-${index}`}
+                  fill={entry.delta && entry.delta > 0 ? '#10b981' : '#f43f5e'}
+                  opacity={0.5}
+                />
+              ))}
+            </Bar>
+            {/* 累计能量曲线（左轴） - 后渲染在前景 */}
             <Area
+              yAxisId="left"
               type="monotone"
-              dataKey="score"
-              stroke="#4f46e5"
-              strokeWidth={2}
-              fillOpacity={1}
-              fill="url(#colorScoreDaily)"
+              dataKey="energy"
+              stroke="#3b82f6"
+              strokeWidth={3}
+              fillOpacity={0}
+              fill="none"
               animationDuration={1000}
               connectNulls
               dot={<CustomDot />}

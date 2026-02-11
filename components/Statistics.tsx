@@ -5,6 +5,7 @@ import HeatmapChart from './HeatmapChart';
 import MoodHistory from './MoodHistory';
 import MoodHourlyDistribution from './MoodHourlyDistribution';
 import TriggerAnalysisChart from './TriggerAnalysisChart';
+import WeeklyEnergyChart from './WeeklyEnergyChart';
 import { WeeklySummaryCard } from './WeeklySummaryCard';
 import { generateWeeklyReport, WeeklyReport, DailySummary } from '../services/geminiService';
 
@@ -198,6 +199,9 @@ const Statistics: React.FC<Props> = ({ entries, customMoods }) => {
       {/* 总览视图 */}
       {activeView === 'overview' && (
         <div className="space-y-4">
+          {/* 新增：过去一周电量柱状图 */}
+          <WeeklyEnergyChart entries={entries} />
+
           {/* 热力图 */}
           <div className="glass-card rounded-[2rem] p-4">
             <h3 className="text-sm font-bold text-gray-600 mb-3 px-1">情绪热力图</h3>

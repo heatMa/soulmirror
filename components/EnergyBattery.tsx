@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { DiaryEntry } from '../types';
 import { MOOD_OPTIONS, MoodOption, getHexFromTailwind } from '../constants';
+import { DAILY_STARTING_ENERGY } from '../utils/energyUtils';
 
 interface Props {
   entries: DiaryEntry[];  // 今日的条目
@@ -128,9 +129,10 @@ const EnergyBattery: React.FC<Props> = ({ entries, allEntries, customMoods = [] 
     return maxStreak;
   }, [allEntries]);
 
-  // 计算总分数
-  const totalScore = useMemo(() => {
-    return entries.reduce((sum, entry) => sum + (entry.moodScore || 0), 0);
+  // 计算今日剩余电量（从100开始累加所有能量变化）
+  const remainingEnergy = useMemo(() => {
+    const totalDelta = entries.reduce((sum, entry) => sum + (entry.energyDelta || entry.moodScore || 0), 0);
+    return Math.max(0, DAILY_STARTING_ENERGY + totalDelta);
   }, [entries]);
 
   // 生成块数据（按时间顺序，最早的在左边）
@@ -142,9 +144,10 @@ const EnergyBattery: React.FC<Props> = ({ entries, allEntries, customMoods = [] 
 
     return sortedEntries.map(entry => {
       const config = getMoodConfig(entry.mood);
-      // 优先使用 entry 保存的颜色，其次是配置的颜色，最后是默认颜色
+      // 优先使用 entry 保存的颜色,其次是配置的颜色,最后是默认颜色
       const hexColor = entry.moodHexColor || config?.hexColor || getHexFromTailwind(config?.color || 'bg-gray-400');
-      const score = entry.moodScore || 1;
+      // 使用 energyDelta（能量变化值），如果没有则用 moodScore
+      const score = entry.energyDelta ?? entry.moodScore ?? 1;
 
       return {
         id: entry.id,
@@ -157,7 +160,7 @@ const EnergyBattery: React.FC<Props> = ({ entries, allEntries, customMoods = [] 
           minute: '2-digit'
         }),
         content: entry.content,
-        widthPx: score * pxPerScore
+        widthPx: Math.abs(score) * pxPerScore  // 使用绝对值计算宽度
       };
     });
   }, [entries, allMoodConfigs, pxPerScore]);
@@ -208,7 +211,7 @@ const EnergyBattery: React.FC<Props> = ({ entries, allEntries, customMoods = [] 
           今日第 <span className="text-lg text-gray-800">{entries.length}</span> 次
         </div>
         <div className="text-sm font-bold text-gray-600">
-          总分: <span className="text-lg text-indigo-500">{totalScore.toFixed(1)}</span>
+          剩余能量: <span className="text-lg text-indigo-500">{Math.round(remainingEnergy)}</span>%
         </div>
       </div>
 

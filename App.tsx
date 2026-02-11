@@ -13,6 +13,7 @@ import Statistics from './components/Statistics';
 import { ICONS, MOOD_OPTIONS, MoodOption } from './constants';
 import { evaluateMoodScore, generateAiReply, generateRegulationSuggestions } from './services/geminiService';
 import { databaseService } from './services/databaseService';
+import { getEnergyAfterEntry } from './utils/energyUtils';
 
 const App: React.FC = () => {
   const [entries, setEntries] = useState<DiaryEntry[]>([]);
@@ -108,7 +109,9 @@ const App: React.FC = () => {
           timestamp: formData.timestamp || Date.now(),
           content: formData.content,
           mood: formData.mood,
-          moodScore: formData.moodScore,
+          moodScore: formData.moodScore, // 会被 AI 评分覆盖
+          energyDelta: formData.energyDelta,
+          scoreVersion: 'v2',
           moodEmoji: formData.moodEmoji,
           moodHexColor: formData.moodHexColor,
           tags: formData.tags
@@ -117,17 +120,23 @@ const App: React.FC = () => {
         await databaseService.updateEntry(updatedEntry);
         setEntries(prev => prev.map(e => e.id === updatedEntry.id ? updatedEntry : e));
 
-        // AI 重新评分
-        evaluateMoodScore(updatedEntry.mood, updatedEntry.content)
+        // AI 重新评分（能量系统）
+        const presetScore = formData.moodScore; // 预设分数
+        evaluateMoodScore(updatedEntry.mood, updatedEntry.content, presetScore)
           .then(async (aiScore) => {
-            if (aiScore > 0) {
-              await databaseService.updateEntryMoodScore(updatedEntry.id, aiScore);
+            if (aiScore !== undefined) {
+              await databaseService.updateEntry({
+                ...updatedEntry,
+                moodScore: aiScore,
+                energyDelta: aiScore,
+                scoreVersion: 'v2'
+              });
               setEntries(currentEntries =>
-                currentEntries.map(e => e.id === updatedEntry.id ? { ...e, moodScore: aiScore } : e)
+                currentEntries.map(e => e.id === updatedEntry.id ? { ...e, moodScore: aiScore, energyDelta: aiScore, scoreVersion: 'v2' } : e)
               );
 
-              // 负面情绪时生成调节建议（评分 ≤ 5）
-              if (aiScore <= 5) {
+              // 负面情绪时生成调节建议（评分 ≤ -3）
+              if (aiScore <= -3) {
                 generateRegulationSuggestions(updatedEntry.mood, updatedEntry.content, aiScore)
                   .then(async (suggestions) => {
                     if (suggestions && suggestions.length > 0) {
@@ -139,7 +148,7 @@ const App: React.FC = () => {
                   })
                   .catch(console.error);
               } else {
-                // 如果情绪变好了（评分 > 5），清除之前的调节建议
+                // 如果情绪变好了（评分 > -3），清除之前的调节建议
                 await databaseService.updateEntryAiSuggestions(updatedEntry.id, []);
                 setEntries(currentEntries =>
                   currentEntries.map(e => e.id === updatedEntry.id ? { ...e, aiSuggestions: undefined } : e)
@@ -169,7 +178,9 @@ const App: React.FC = () => {
           timestamp,
           content: formData.content,
           mood: formData.mood,
-          moodScore: formData.moodScore,
+          moodScore: formData.moodScore, // 预设分数，会被 AI 覆盖
+          energyDelta: formData.moodScore, // 初始使用预设分数，会被 AI 更新
+          scoreVersion: 'v2' as const,
           moodEmoji: formData.moodEmoji,
           moodHexColor: formData.moodHexColor,
           tags: formData.tags
@@ -178,17 +189,36 @@ const App: React.FC = () => {
         const newEntry = await databaseService.addEntry(entryData);
         setEntries(prev => [newEntry, ...prev]);
 
-        // AI 后台评分
-        evaluateMoodScore(newEntry.mood, newEntry.content)
+        // AI 后台评分（能量系统）
+        const presetScore = formData.moodScore; // 预设分数
+        evaluateMoodScore(newEntry.mood, newEntry.content, presetScore)
           .then(async (aiScore) => {
-            if (aiScore > 0) {
-              await databaseService.updateEntryMoodScore(newEntry.id, aiScore);
+            if (aiScore !== undefined) {
+              // 计算该条记录后的剩余电量
+              const todayEntries = entries.filter(e => {
+                const eDate = new Date(e.timestamp);
+                const nDate = new Date(newEntry.timestamp);
+                return eDate.getDate() === nDate.getDate() &&
+                       eDate.getMonth() === nDate.getMonth() &&
+                       eDate.getFullYear() === nDate.getFullYear();
+              });
+
+              const updatedEntryForEnergy = { ...newEntry, energyDelta: aiScore, scoreVersion: 'v2' as const };
+              const energyRemaining = getEnergyAfterEntry([...todayEntries, updatedEntryForEnergy], updatedEntryForEnergy);
+
+              await databaseService.updateEntry({
+                ...newEntry,
+                moodScore: aiScore,
+                energyDelta: aiScore,
+                scoreVersion: 'v2' as const
+              });
+
               setEntries(currentEntries =>
-                currentEntries.map(e => e.id === newEntry.id ? { ...e, moodScore: aiScore } : e)
+                currentEntries.map(e => e.id === newEntry.id ? { ...e, moodScore: aiScore, energyDelta: aiScore, scoreVersion: 'v2' } : e)
               );
 
-              // 负面情绪时生成调节建议（评分 ≤ 5）
-              if (aiScore <= 5) {
+              // 负面情绪时生成调节建议（评分 ≤ -3）
+              if (aiScore <= -3) {
                 generateRegulationSuggestions(newEntry.mood, newEntry.content, aiScore)
                   .then(async (suggestions) => {
                     if (suggestions && suggestions.length > 0) {
@@ -201,7 +231,7 @@ const App: React.FC = () => {
                   .catch(console.error);
               }
 
-              // AI 暖心回复（传入评分，评分≤5时会生成鸡汤）
+              // AI 暖心回复
               generateAiReply(newEntry.mood, newEntry.content, aiScore)
                 .then(async (reply) => {
                   if (reply) {
@@ -219,7 +249,7 @@ const App: React.FC = () => {
     } catch (error) {
       console.error('保存日记条目失败:', error);
     }
-  }, [selectedDate]);
+  }, [entries, selectedDate]);
 
   // 删除日记条目
   const deleteEntry = useCallback(async (entry: DiaryEntry) => {
@@ -504,6 +534,9 @@ const App: React.FC = () => {
                   const isLast = index === timelineEntries.length - 1;
                   const { countToday, countWeek, countMonth } = getEntryCounts(entry);
 
+                  // 计算该条记录后的剩余电量
+                  const energyRemaining = getEnergyAfterEntry(timelineEntries, entry);
+
                   return (
                     <TimelineItem
                         key={entry.id}
@@ -516,6 +549,7 @@ const App: React.FC = () => {
                         countToday={countToday}
                         countWeek={countWeek}
                         countMonth={countMonth}
+                        energyRemaining={energyRemaining}
                     />
                   );
                 })}

@@ -220,6 +220,20 @@ class DatabaseService {
         await this.db.execute('ALTER TABLE diary_entries ADD COLUMN is_active INTEGER DEFAULT 0');
         console.log('数据库迁移：添加 is_active 列');
       }
+
+      // 检查能量电池系统相关列
+      const hasEnergyDelta = entriesColumns.some((col: any) => col.name === 'energy_delta');
+      const hasScoreVersion = entriesColumns.some((col: any) => col.name === 'score_version');
+
+      if (!hasEnergyDelta) {
+        await this.db.execute('ALTER TABLE diary_entries ADD COLUMN energy_delta REAL');
+        console.log('数据库迁移：添加 energy_delta 列');
+      }
+
+      if (!hasScoreVersion) {
+        await this.db.execute("ALTER TABLE diary_entries ADD COLUMN score_version TEXT DEFAULT 'v1'");
+        console.log('数据库迁移：添加 score_version 列');
+      }
     } catch (error) {
       console.error('数据库迁移失败:', error);
     }
@@ -267,8 +281,8 @@ class DatabaseService {
 
     if (this.isNative && this.db) {
       await this.db.run(
-        `INSERT INTO diary_entries (id, timestamp, mood, mood_score, mood_emoji, mood_hex_color, content, tags, end_timestamp, duration, is_active)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO diary_entries (id, timestamp, mood, mood_score, mood_emoji, mood_hex_color, content, tags, end_timestamp, duration, is_active, energy_delta, score_version)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           id,
           entry.timestamp,
@@ -280,7 +294,9 @@ class DatabaseService {
           JSON.stringify(entry.tags),
           entry.endTimestamp || null,
           entry.duration || null,
-          entry.isActive ? 1 : 0
+          entry.isActive ? 1 : 0,
+          entry.energyDelta || null,
+          entry.scoreVersion || 'v2'
         ]
       );
     } else {
@@ -301,7 +317,7 @@ class DatabaseService {
     if (this.isNative && this.db) {
       await this.db.run(
         `UPDATE diary_entries
-         SET timestamp = ?, mood = ?, mood_score = ?, mood_emoji = ?, mood_hex_color = ?, content = ?, tags = ?, end_timestamp = ?, duration = ?, is_active = ?
+         SET timestamp = ?, mood = ?, mood_score = ?, mood_emoji = ?, mood_hex_color = ?, content = ?, tags = ?, end_timestamp = ?, duration = ?, is_active = ?, energy_delta = ?, score_version = ?
          WHERE id = ?`,
         [
           entry.timestamp,
@@ -314,6 +330,8 @@ class DatabaseService {
           entry.endTimestamp || null,
           entry.duration || null,
           entry.isActive ? 1 : 0,
+          entry.energyDelta || null,
+          entry.scoreVersion || 'v2',
           entry.id
         ]
       );
@@ -413,7 +431,9 @@ class DatabaseService {
       aiSuggestions: row.ai_suggestions ? JSON.parse(row.ai_suggestions as string) : undefined,
       endTimestamp: row.end_timestamp as number | undefined,
       duration: row.duration as number | undefined,
-      isActive: Boolean(row.is_active)
+      isActive: Boolean(row.is_active),
+      energyDelta: row.energy_delta as number | undefined,
+      scoreVersion: (row.score_version as string) || 'v1'
     };
   }
 
