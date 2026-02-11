@@ -45,7 +45,7 @@ export interface DailyJournal {
   date: string;                                      // YYYY-MM-DD
   content: string;                                   // 日记内容（富文本HTML）
   deepReflection?: string;                           // AI深度回看内容（纯文本）
-  deepReflectionSource?: 'journal-only' | 'journal-with-moods';  // 分析来源
+  deepReflectionSource?: 'journal-only' | 'moods-only' | 'journal-with-moods';  // 分析来源
   deepReflectionTimestamp?: number;                  // AI分析生成时间戳
 }
 

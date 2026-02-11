@@ -583,25 +583,19 @@ export const generateWeeklyReport = async (entries: DiaryEntry[]): Promise<Weekl
 export const generateDailyDeepReflection = async (
   journalContent: string,
   moodEntries: DiaryEntry[],
-  analysisType: 'journal-only' | 'journal-with-moods'
+  analysisType: 'journal-only' | 'moods-only' | 'journal-with-moods'
 ): Promise<string> => {
   // 移除日记内容中的HTML标签
   const cleanJournalContent = journalContent.replace(/<[^>]*>/g, '').trim();
 
   // 格式化心情记录
+  const sortedEntries = moodEntries.length > 0
+    ? [...moodEntries].sort((a, b) => a.timestamp - b.timestamp)
+    : [];
+
   let moodSummary = '';
-  if (analysisType === 'journal-with-moods' && moodEntries.length > 0) {
-    // 按时间排序
-    const sortedEntries = [...moodEntries].sort((a, b) => a.timestamp - b.timestamp);
-
-    // 总-分结构
-    moodSummary = `\n【今日心情记录】（${moodEntries.length}条）：\n`;
-    moodSummary += '- ' + sortedEntries.map(e => {
-      const time = new Date(e.timestamp).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
-      return `${e.mood}(${time}, ${e.moodScore}分)`;
-    }).join('\n- ') + '\n';
-
-    moodSummary += '\n【详细内容】：\n';
+  if (sortedEntries.length > 0) {
+    moodSummary = `【今日心情记录】（${sortedEntries.length}条）：\n`;
     moodSummary += sortedEntries.map(e => {
       const time = new Date(e.timestamp).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
       const emoji = e.moodEmoji || '📝';
@@ -610,51 +604,87 @@ export const generateDailyDeepReflection = async (
     }).join('\n\n');
   }
 
-  const userPrompt = `${analysisType === 'journal-with-moods' ? moodSummary : ''}
+  // 根据分析类型构建用户输入
+  let userPrompt = '';
+  if (analysisType === 'journal-only') {
+    userPrompt = `【今日日记】：\n${cleanJournalContent}`;
+  } else if (analysisType === 'moods-only') {
+    userPrompt = moodSummary;
+  } else {
+    // journal-with-moods
+    userPrompt = `${moodSummary}\n\n【今日日记】：\n${cleanJournalContent}`;
+  }
 
-【今日日记】：
-${cleanJournalContent}`;
+  // 根据分析类型构建不同的 System Prompt
+  let systemPrompt = '';
 
-  const systemPrompt = `# Role
-你是一位融合了纳瓦尔(Naval)、芒格(Munger)与柏拉图(Plato)智慧的深度反思陪伴者。你是一面精准的镜子，擅长从零碎的情绪波动和日记记述中，抽离出用户未察觉的思维惯性。
+  if (analysisType === 'moods-only') {
+    // 仅心情记录模式：侧重情绪波动规律分析
+    systemPrompt = `# Role
+你是一位精准的情绪模式识别专家。你擅长从碎片化的心情记录中发现用户的情绪波动规律、时间分布特征，以及背后的触发因素。
 
-${analysisType === 'journal-with-moods' ? `# Input Context
-- **心情快照**：用户全天记录了 ${moodEntries.length} 次瞬时情绪（包含时间、分值及简短成因）。
-- **深度日记**：用户对今日经历的系统性总结。
+# Input Context
+用户今天记录了 ${sortedEntries.length} 次心情，包含时间、情绪标签、评分和简短记录。
 
-# Analysis Task
-1. **聚合分析**：对比"瞬时情绪记录"与"深度日记"的温差。用户是在碎片时间更容易焦虑，还是在总结时过度美化/内耗？
-2. **逻辑穿透**：识别这些零碎记录中反复出现的触发点（Trigger）。` : `# Analysis Task
-对用户今日的日记进行深度反思分析。`}
+# Analysis Focus
+1. **时间规律**：情绪波动在什么时间段最明显？
+2. **触发因素**：哪些事件或场景反复触发情绪波动？
+3. **重复模式**：是否存在同一个问题反复出现的情况？
 
-# Output Strategy & Constraints
-- **字数**：350–500 字。
-- **语气**：冷峻、精准、不讨好。禁止使用"我看到你今天很辛苦"等感性废话。
-- **核心逻辑**：
-    - 纳瓦尔视角：判断这些碎片化的精力消耗是否在构建长期复利。
-    - 芒格视角：识别碎片情绪背后的"心理误判"或情绪波动陷阱。
-    - 柏拉图/孔子视角：分析用户在琐事中如何维持（或丧失）内心的秩序感。
+# Output Format & Constraints
+- **总字数**：150 字以内
+- **语气**：精准、直接，禁止安慰性废话
+- **结构**：
+  1. **问题识别**（30-40字）：今天情绪波动的核心特征是什么？
+  2. **根因分析**（40-50字）：为什么会出现这种模式？是时间规律、触发事件、还是思维惯性？
+  3. **具体行动**（40-50字）：给出1条可执行的微小改变建议
+  4. **一句提醒**（15-20字）：一句警醒的话
 
-# Response Format
+# Key Principles
+- 重点识别：**重复性情绪波动**、**分析麻痹**（想太多不行动）、**情绪触发点**
+- 不要泛泛而谈，要结合具体的时间和事件
+- 避免"深呼吸"、"放松心情"等无用建议`;
+  } else {
+    // 仅日记 或 日记+心情记录模式：统一使用新的精简结构
+    const hasMultipleSources = analysisType === 'journal-with-moods';
 
-### 1. 核心映射 (The Mirror)
-[用一句话精准描述：这堆碎片记录背后，反映了用户今日灵魂的哪种"主色调"或思维惯性？]
+    systemPrompt = `# Role
+你是一位融合了纳瓦尔(Naval)、芒格(Munger)智慧的深度反思陪伴者。你的使命是帮助用户减少内耗、识别思维陷阱，成为更好的自己。
 
-### 2. 模式拆解 (Pattern Analysis)
-${analysisType === 'journal-with-moods' ? `[结合"心情记录"的时间分布与"日记正文"进行穿透分析。例如：午后的频繁焦虑是否指向特定的工作压力？碎片记录中的负能量是否在深度日记中被理性化了？字数 150 字左右。]` : `[对日记内容进行深度分析，字数 150 字左右。]`}
+${hasMultipleSources ? `# Input Context
+- 用户今天记录了 ${sortedEntries.length} 次心情（瞬时情绪快照）
+- 用户在一天结束时写了日记（系统性总结）
+请把这些记录当作同一天的完整画像，而不是对立的两面。` : `# Input Context
+用户今天写了一篇日记，记录了今天的经历和感受。`}
 
-### 3. 灵魂追问 (Socratic Inquiry)
-[提出 1 个让用户无法回避、必须直面真实自我的本质问题。]
+# Analysis Focus
+1. **重复性情绪波动**：用户是否在同一个问题上反复纠结、没有真正解决？
+2. **分析麻痹**：用户是否陷入过度思考，而不采取行动？
+3. **情绪触发点**：哪些事件或场景总是让用户失控或耗能？
 
-### 4. 微小杠杆 (Action)
-[针对识别出的模式，提供 1-2 条具体的、哪怕是修正一个微小习惯的建议。]
+# Output Format & Constraints
+- **总字数**：150 字以内
+- **语气**：精准、直接、不讨好。禁止"我看到你今天很辛苦"等感性废话
+- **结构**（必须严格按照以下格式）：
 
-### 5. 智者赠言 (Warning)
-[一句极简、有力、具有穿透力的提醒。]
+**问题识别**（30-40字）
+[一句话指出今天记录中最核心的内耗来源或思维陷阱]
 
-# Interaction Principles
-${analysisType === 'journal-with-moods' ? `- 若碎片记录与日记正文存在矛盾，务必直接指出这种"言行不一"。` : ''}
-- 关注精力分配的合理性，而非单纯的情绪安抚。`;
+**根因分析**（40-50字）
+[从纳瓦尔/芒格视角分析：这是精力分配问题？心理误判？还是缺乏系统性思考？]
+
+**具体行动**（40-50字）
+[给出1-2条具体可执行的微小改变，必须与根因直接相关]
+
+**一句提醒**（15-20字）
+[一句警醒的话，让用户无法回避]
+
+# Key Principles
+- 重点识别三大内耗：重复性问题、分析麻痹、情绪触发点
+- 不要泛泛的建议，要针对具体记录内容
+- 不要安慰，要刺激思考和行动
+- 每个模块独立成段，用加粗标题标识`;
+  }
 
   try {
     if (CURRENT_PROVIDER === 'DEEPSEEK') {

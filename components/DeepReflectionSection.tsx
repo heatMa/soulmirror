@@ -15,7 +15,7 @@ const DeepReflectionSection: React.FC<Props> = ({ selectedDate, moodEntries }) =
   const [isExpanded, setIsExpanded] = useState(false);
   const [journalContent, setJournalContent] = useState('');
   const [deepReflection, setDeepReflection] = useState('');
-  const [deepReflectionSource, setDeepReflectionSource] = useState<'journal-only' | 'journal-with-moods'>('journal-only');
+  const [deepReflectionSource, setDeepReflectionSource] = useState<'journal-only' | 'moods-only' | 'journal-with-moods'>('journal-only');
   const [isReflectionCollapsed, setIsReflectionCollapsed] = useState(true);
   const [isGenerating, setIsGenerating] = useState(false);
   const [showSourceDialog, setShowSourceDialog] = useState(false);
@@ -90,22 +90,12 @@ const DeepReflectionSection: React.FC<Props> = ({ selectedDate, moodEntries }) =
       return;
     }
 
-    // 自动选择逻辑
-    if (hasJournal && hasMoods) {
-      // 两者都有 → 弹窗选择
-      setShowSourceDialog(true);
-    } else if (hasJournal && !hasMoods) {
-      // 只有日记 → 直接用日记
-      handleGenerate('journal-only');
-    } else if (!hasJournal && hasMoods) {
-      // 只有心情 → 直接用心情
-      handleGenerate('journal-with-moods');
-    }
-
+    // 新的弹窗逻辑：只要有任何内容就弹窗让用户选择
+    setShowSourceDialog(true);
     setError('');
   };
 
-  const handleGenerate = async (source: 'journal-only' | 'journal-with-moods') => {
+  const handleGenerate = async (source: 'journal-only' | 'moods-only' | 'journal-with-moods') => {
     setShowSourceDialog(false);
     setIsGenerating(true);
     setError('');
@@ -138,14 +128,8 @@ const DeepReflectionSection: React.FC<Props> = ({ selectedDate, moodEntries }) =
   };
 
   const handleRegenerate = () => {
-    // 重新生成时也使用自动选择逻辑
-    if (hasJournal && hasMoods) {
-      setShowSourceDialog(true);
-    } else if (hasJournal) {
-      handleGenerate('journal-only');
-    } else if (hasMoods) {
-      handleGenerate('journal-with-moods');
-    }
+    // 重新生成时也弹窗选择
+    setShowSourceDialog(true);
   };
 
   return (
@@ -271,26 +255,41 @@ const DeepReflectionSection: React.FC<Props> = ({ selectedDate, moodEntries }) =
             <h3 className="text-lg font-bold text-gray-800 mb-4">选择分析来源</h3>
             <div className="space-y-3">
               {/* 日记 + 心情记录（默认推荐） */}
-              <button
-                onClick={() => handleGenerate('journal-with-moods')}
-                className="w-full p-4 border-2 border-indigo-400 bg-indigo-50 rounded-xl hover:border-indigo-600 transition-all text-left"
-              >
-                <div className="font-semibold text-indigo-700">
-                  📝+😊 日记 + 心情记录（推荐）
-                </div>
-                <div className="text-sm text-indigo-600 mt-1">
-                  包含今天的 {moodEntries.length} 条心情记录，分析更全面
-                </div>
-              </button>
+              {hasJournal && hasMoods && (
+                <button
+                  onClick={() => handleGenerate('journal-with-moods')}
+                  className="w-full p-4 border-2 border-indigo-400 bg-indigo-50 rounded-xl hover:border-indigo-600 transition-all text-left"
+                >
+                  <div className="font-semibold text-indigo-700">
+                    📝+😊 日记 + 心情记录（推荐）
+                  </div>
+                  <div className="text-sm text-indigo-600 mt-1">
+                    综合分析今天的 {moodEntries.length} 条心情记录和日记内容
+                  </div>
+                </button>
+              )}
 
               {/* 仅日记 */}
-              <button
-                onClick={() => handleGenerate('journal-only')}
-                className="w-full p-4 border-2 border-gray-200 rounded-xl hover:border-indigo-400 hover:bg-indigo-50 transition-all text-left"
-              >
-                <div className="font-semibold text-gray-800">📝 仅日记</div>
-                <div className="text-sm text-gray-500 mt-1">只分析今天的日记内容</div>
-              </button>
+              {hasJournal && (
+                <button
+                  onClick={() => handleGenerate('journal-only')}
+                  className="w-full p-4 border-2 border-gray-200 rounded-xl hover:border-indigo-400 hover:bg-indigo-50 transition-all text-left"
+                >
+                  <div className="font-semibold text-gray-800">📝 仅日记</div>
+                  <div className="text-sm text-gray-500 mt-1">只分析今天的日记内容</div>
+                </button>
+              )}
+
+              {/* 仅心情记录 */}
+              {hasMoods && (
+                <button
+                  onClick={() => handleGenerate('moods-only')}
+                  className="w-full p-4 border-2 border-gray-200 rounded-xl hover:border-indigo-400 hover:bg-indigo-50 transition-all text-left"
+                >
+                  <div className="font-semibold text-gray-800">😊 仅心情记录</div>
+                  <div className="text-sm text-gray-500 mt-1">分析今天 {moodEntries.length} 条心情的波动规律</div>
+                </button>
+              )}
             </div>
 
             {/* 取消按钮 */}
