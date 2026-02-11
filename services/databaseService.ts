@@ -502,8 +502,11 @@ class DatabaseService {
     await this.ensureInitialized();
 
     if (this.isNative && this.db) {
+      // 使用 INSERT ... ON CONFLICT 保留其他字段
       await this.db.run(
-        `INSERT OR REPLACE INTO daily_notes (date_str, content) VALUES (?, ?)`,
+        `INSERT INTO daily_notes (date_str, content)
+         VALUES (?, ?)
+         ON CONFLICT(date_str) DO UPDATE SET content = excluded.content`,
         [dateStr, content]
       );
     } else {
@@ -527,7 +530,7 @@ class DatabaseService {
   async updateDeepReflection(
     dateStr: string,
     deepReflection: string,
-    source: 'journal-only' | 'journal-with-moods'
+    source: 'journal-only' | 'moods-only' | 'journal-with-moods'
   ): Promise<void> {
     await this.ensureInitialized();
 
