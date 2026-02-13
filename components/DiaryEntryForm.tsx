@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { DiaryEntry } from '../types';
-import { MOOD_OPTIONS, MoodOption, ICONS, MOOD_COLOR_PALETTE, getHexFromTailwind } from '../constants';
+import { MOOD_OPTIONS, MoodOption, ICONS, MOOD_COLOR_PALETTE, getHexFromTailwind, getEffectiveCustomMoods } from '../constants';
 import { generateMoodMetadata } from '../services/geminiService';
 import { databaseService } from '../services/databaseService';
 import { formatDuration, parseDurationInput, calculateDurationInMinutes } from '../utils/timeUtils';
@@ -82,7 +82,7 @@ const DiaryEntryForm: React.FC<Props> = ({ initialData, onSave, onClose }) => {
         contentRef.current.innerHTML = initialData.content || '';
       }
       // 尝试查找匹配的心情，如果没有找到则创建一个临时的
-      const allMoods = [...MOOD_OPTIONS, ...customMoods];
+      const allMoods = [...MOOD_OPTIONS, ...getEffectiveCustomMoods(customMoods)];
       const match = allMoods.find(m => m.label === initialData.mood);
       if (match) {
         setSelectedMood(match);
@@ -260,7 +260,8 @@ const DiaryEntryForm: React.FC<Props> = ({ initialData, onSave, onClose }) => {
       tags: [selectedMood.label],
       duration: duration,
       isActive: isActive,
-      endTimestamp: initialData?.endTimestamp, // 编辑时保留原始的 endTimestamp
+      // 手动填写持续时间时优先使用 duration，不保留 endTimestamp
+      endTimestamp: duration ? undefined : initialData?.endTimestamp,
     });
 
     onClose();
@@ -381,7 +382,7 @@ const DiaryEntryForm: React.FC<Props> = ({ initialData, onSave, onClose }) => {
                 </div>
               ))}
 
-              {customMoods.map((m) => (
+              {getEffectiveCustomMoods(customMoods).map((m) => (
                 <div key={m.value} className="relative group">
                   <button
                     type="button"

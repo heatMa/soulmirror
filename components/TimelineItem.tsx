@@ -218,7 +218,7 @@ const TimelineItem: React.FC<Props> = ({
                 <span className="text-sm font-medium text-gray-400 font-mono tracking-tight">
                   {timeString}
                 </span>
-                {entry.energyDelta !== undefined && energyRemaining !== undefined && (
+                {entry.energyDelta != null && energyRemaining !== undefined && (
                   <span className="text-sm font-bold" style={{ color: entry.energyDelta >= 0 ? '#10b981' : '#f43f5e' }}>
                     {formatEnergyDisplay(entry.energyDelta, energyRemaining)}
                   </span>

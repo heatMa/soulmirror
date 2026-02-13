@@ -49,6 +49,12 @@ export const getHexFromTailwind = (tailwindClass: string): string => {
   return mapping[tailwindClass] || '#64748b';
 };
 
+// 过滤掉与默认心情重复的自定义心情，避免界面出现重复项
+export const getEffectiveCustomMoods = (customMoods: MoodOption[]): MoodOption[] => {
+  const defaultLabels = new Set(MOOD_OPTIONS.map(m => m.label));
+  return customMoods.filter(m => !defaultLabels.has(m.label));
+};
+
 export const MOOD_OPTIONS: MoodOption[] = [
   { label: '开心', value: 'happy', score: 8, emoji: '😊', color: 'bg-emerald-500', hexColor: '#10b981', shadow: 'shadow-emerald-200', suggestions: ['顺利', '收获', '惊喜'] },
   { label: '平静', value: 'calm', score: 1, emoji: '😌', color: 'bg-sky-400', hexColor: '#38bdf8', shadow: 'shadow-sky-200', suggestions: ['放松', '舒适', '安心'] },

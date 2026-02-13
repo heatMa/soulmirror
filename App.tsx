@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { DiaryEntry, ViewMode } from './types';
 import DiaryEntryForm from './components/DiaryEntryForm';
 import Dashboard from './components/Dashboard';
@@ -10,7 +10,7 @@ import WeeklyGoal from './components/WeeklyGoal';
 import TimelineItem from './components/TimelineItem';
 import DeepReflectionSection from './components/DeepReflectionSection';
 import Statistics from './components/Statistics';
-import { ICONS, MOOD_OPTIONS, MoodOption } from './constants';
+import { ICONS, MOOD_OPTIONS, MoodOption, getEffectiveCustomMoods } from './constants';
 import { evaluateMoodScore, generateAiReply, generateRegulationSuggestions } from './services/geminiService';
 import { databaseService } from './services/databaseService';
 import { getEnergyAfterEntry } from './utils/energyUtils';
@@ -44,7 +44,11 @@ const App: React.FC = () => {
           databaseService.getAllDailyNotes(),
           databaseService.getCustomMoods()
         ]);
-        
+
+        // 清理与默认心情重复的自定义心情（持久化清理，下次加载时不再有重复）
+        const defaultLabels = MOOD_OPTIONS.map(m => m.label);
+        await databaseService.removeDuplicateCustomMoods(defaultLabels);
+
         setEntries(loadedEntries);
         setDailyNotes(loadedNotes);
         setCustomMoods(loadedCustomMoods);
@@ -114,7 +118,10 @@ const App: React.FC = () => {
           scoreVersion: 'v2',
           moodEmoji: formData.moodEmoji,
           moodHexColor: formData.moodHexColor,
-          tags: formData.tags
+          tags: formData.tags,
+          endTimestamp: formData.duration ? undefined : formData.endTimestamp,
+          duration: formData.duration,
+          isActive: formData.isActive
         };
 
         await databaseService.updateEntry(updatedEntry);
@@ -183,7 +190,10 @@ const App: React.FC = () => {
           scoreVersion: 'v2' as const,
           moodEmoji: formData.moodEmoji,
           moodHexColor: formData.moodHexColor,
-          tags: formData.tags
+          tags: formData.tags,
+          endTimestamp: formData.duration ? undefined : formData.endTimestamp,
+          duration: formData.duration,
+          isActive: formData.isActive
         };
 
         const newEntry = await databaseService.addEntry(entryData);
@@ -304,6 +314,8 @@ const App: React.FC = () => {
       console.error('刷新数据失败:', error);
     }
   }, []);
+
+  const effectiveCustomMoods = useMemo(() => getEffectiveCustomMoods(customMoods), [customMoods]);
 
   const getMoodConfig = (moodLabel: string, entry?: DiaryEntry): MoodOption => {
     const found = MOOD_OPTIONS.find(m => m.label === moodLabel) ||
@@ -499,7 +511,7 @@ const App: React.FC = () => {
             {/* Daily Mood Chart */}
             {timelineEntries.length > 0 && (
               <div className="mb-4 h-48 animate-in fade-in slide-in-from-bottom-6 duration-700">
-                 <DailyMoodChart entries={timelineEntries} customMoods={customMoods} />
+                 <DailyMoodChart entries={timelineEntries} customMoods={effectiveCustomMoods} />
               </div>
             )}
 
@@ -518,7 +530,7 @@ const App: React.FC = () => {
 
             {/* Energy Battery */}
             <div className="mb-6 animate-in fade-in slide-in-from-bottom-6 duration-700">
-               <EnergyBattery entries={timelineEntries} allEntries={entries} customMoods={customMoods} />
+               <EnergyBattery entries={timelineEntries} allEntries={entries} customMoods={effectiveCustomMoods} />
             </div>
             
             {timelineEntries.length === 0 ? (
@@ -565,7 +577,7 @@ const App: React.FC = () => {
           <Dashboard entries={entries} onDataRestored={handleDataRestored} />
         </div>
       ) : (
-        <Statistics entries={entries} customMoods={customMoods} />
+        <Statistics entries={entries} customMoods={effectiveCustomMoods} />
       )}
 
       {/* Floating Action Button */}

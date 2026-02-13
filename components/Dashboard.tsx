@@ -45,11 +45,48 @@ const CustomTooltip = ({ active, payload, label }: any) => {
   return null;
 };
 
+// 数据库持久化 AI 洞察结果的 key 前缀
+const ANALYSIS_DB_KEY_PREFIX = 'analysis_cache_';
+
 const Dashboard: React.FC<Props> = ({ entries, onDataRestored }) => {
   const [analysis, setAnalysis] = useState<AIAnalysis | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [timeRange, setTimeRange] = useState<TimeRange>('today');
+
+  // 切换时间范围或组件挂载时，从数据库加载对应缓存
+  useEffect(() => {
+    let cancelled = false;
+    const loadCachedAnalysis = async () => {
+      try {
+        const raw = await databaseService.getSetting(`${ANALYSIS_DB_KEY_PREFIX}${timeRange}`);
+        if (cancelled) return; // 时间范围已切换，丢弃过期的异步结果
+        if (raw) {
+          setAnalysis(JSON.parse(raw) as AIAnalysis);
+        } else {
+          setAnalysis(null);
+        }
+      } catch (e) {
+        if (cancelled) return;
+        console.error('加载 AI 洞察缓存失败:', e);
+        setAnalysis(null);
+      }
+    };
+    loadCachedAnalysis();
+    return () => { cancelled = true; };
+  }, [timeRange]);
+
+  // 保存 AI 洞察结果到数据库
+  const saveAnalysisToDb = async (range: TimeRange, result: AIAnalysis) => {
+    try {
+      await databaseService.saveSetting(
+        `${ANALYSIS_DB_KEY_PREFIX}${range}`,
+        JSON.stringify(result)
+      );
+    } catch (e) {
+      console.error('保存 AI 洞察结果失败:', e);
+    }
+  };
   const [customMoods, setCustomMoods] = useState<MoodOption[]>([]);
 
   // Search & Filter State
@@ -162,6 +199,7 @@ const Dashboard: React.FC<Props> = ({ entries, onDataRestored }) => {
     try {
       const result = await analyzeMoods(filteredEntries);
       setAnalysis(result);
+      await saveAnalysisToDb(timeRange, result);
     } catch (err) {
       setError("AI 正在深呼吸，请稍后再试...");
     } finally {
@@ -356,10 +394,7 @@ const Dashboard: React.FC<Props> = ({ entries, onDataRestored }) => {
           {(['today', 'yesterday', 'week', 'month'] as TimeRange[]).map((range) => (
             <button
               key={range}
-              onClick={() => {
-                setTimeRange(range);
-                setAnalysis(null);
-              }}
+              onClick={() => setTimeRange(range)}
               className={`px-3 sm:px-6 py-2 rounded-xl text-xs sm:text-sm font-bold whitespace-nowrap transition-all ${
                 timeRange === range
                   ? 'bg-white text-gray-800 shadow-sm scale-105'

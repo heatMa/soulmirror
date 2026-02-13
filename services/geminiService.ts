@@ -251,8 +251,11 @@ export const evaluateMoodScore = async (mood: string, content: string, presetSco
     }
 
     const result = JSON.parse(cleanJsonString(jsonString));
-    // 确保返回值在 -10 到 +10 范围内
-    const score = Math.max(-10, Math.min(10, result.score ?? presetScore));
+    // 强制限制在预设分数 ±2 范围内，防止 AI 偏离过大
+    const rawScore = result.score ?? presetScore;
+    const minAllowed = Math.max(-10, presetScore - 2);
+    const maxAllowed = Math.min(10, presetScore + 2);
+    const score = Math.max(minAllowed, Math.min(maxAllowed, rawScore));
     return score;
   } catch (error) {
     console.error(`Energy evaluation failed (${CURRENT_PROVIDER}):`, error);

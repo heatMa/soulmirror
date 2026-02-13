@@ -295,7 +295,7 @@ class DatabaseService {
           entry.endTimestamp || null,
           entry.duration || null,
           entry.isActive ? 1 : 0,
-          entry.energyDelta || null,
+          entry.energyDelta ?? null,
           entry.scoreVersion || 'v2'
         ]
       );
@@ -330,7 +330,7 @@ class DatabaseService {
           entry.endTimestamp || null,
           entry.duration || null,
           entry.isActive ? 1 : 0,
-          entry.energyDelta || null,
+          entry.energyDelta ?? null,
           entry.scoreVersion || 'v2',
           entry.id
         ]
@@ -627,6 +627,19 @@ class DatabaseService {
   }
 
   /**
+   * 移除与默认心情重复的自定义心情（用于数据清理）
+   */
+  async removeDuplicateCustomMoods(defaultLabels: string[]): Promise<void> {
+    await this.ensureInitialized();
+    const customMoods = await this.getCustomMoods();
+    const toRemove = customMoods.filter(m => defaultLabels.includes(m.label));
+    if (toRemove.length === 0) return;
+    for (const m of toRemove) {
+      await this.deleteCustomMood(m.label);
+    }
+  }
+
+  /**
    * 删除自定义心情
    */
   async deleteCustomMood(label: string): Promise<void> {
@@ -854,6 +867,40 @@ class DatabaseService {
       const summaries: Record<string, WeeklySummary> = data ? JSON.parse(data) : {};
       delete summaries[weekKey];
       localStorage.setItem(STORAGE_KEYS.WEEKLY_SUMMARIES, JSON.stringify(summaries));
+    }
+  }
+  // ==================== 通用键值存储（user_settings） ====================
+
+  /**
+   * 读取设置项
+   */
+  async getSetting(key: string): Promise<string | null> {
+    await this.ensureInitialized();
+
+    if (this.isNative && this.db) {
+      const result = await this.db.query('SELECT value FROM user_settings WHERE key = ?', [key]);
+      if (result.values && result.values.length > 0) {
+        return result.values[0].value as string;
+      }
+      return null;
+    } else {
+      return localStorage.getItem(`soulmirror_setting_${key}`);
+    }
+  }
+
+  /**
+   * 保存设置项
+   */
+  async saveSetting(key: string, value: string): Promise<void> {
+    await this.ensureInitialized();
+
+    if (this.isNative && this.db) {
+      await this.db.run(
+        'INSERT OR REPLACE INTO user_settings (key, value) VALUES (?, ?)',
+        [key, value]
+      );
+    } else {
+      localStorage.setItem(`soulmirror_setting_${key}`, value);
     }
   }
 }

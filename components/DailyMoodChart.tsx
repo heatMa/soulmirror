@@ -27,7 +27,7 @@ interface TimeRangeSettings {
 
 const DEFAULT_TIME_RANGE: TimeRangeSettings = {
   startHour: 6,
-  endHour: 18
+  endHour: 24
 };
 
 // 从 localStorage 读取用户设置的时间范围
@@ -281,6 +281,7 @@ const DailyMoodChart: React.FC<Props> = ({ entries, customMoods = [] }) => {
               dataKey="hour"
               type="number"
               domain={[timeRange.startHour, timeRange.endHour]}
+              allowDataOverflow={true}
               axisLine={false}
               tickLine={false}
               tick={{fontSize: 9, fill: '#9ca3af'}}
@@ -354,7 +355,8 @@ const DailyMoodChart: React.FC<Props> = ({ entries, customMoods = [] }) => {
               yAxisId="right"
               dataKey="delta"
               animationDuration={800}
-              maxBarSize={24}
+              barSize={10}
+              maxBarSize={10}
               radius={[4, 4, 4, 4]}
             >
               {entryPoints.map((entry, index) => (
