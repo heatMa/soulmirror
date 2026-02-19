@@ -1,9 +1,10 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine, Scatter, ComposedChart, Bar, Cell } from 'recharts';
+import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine, ReferenceArea, Scatter, ComposedChart, Bar, Cell } from 'recharts';
 import { DiaryEntry } from '../types';
 import { MOOD_OPTIONS, MoodOption, getHexFromTailwind } from '../constants';
 import { calculateDailyEnergy, DAILY_STARTING_ENERGY } from '../utils/energyUtils';
+import { getEntryDurationMinutes } from '../utils/timeUtils';
 
 interface Props {
   entries: DiaryEntry[];
@@ -157,6 +158,26 @@ const DailyMoodChart: React.FC<Props> = ({ entries, customMoods = [] }) => {
 
     return points;
   }, [entries, energyLevels]);
+
+  // 有持续时间的记录，用于绘制背景色块
+  const durationRanges = useMemo(() => {
+    return [...entries]
+      .sort((a, b) => a.timestamp - b.timestamp)
+      .map(e => {
+        const minutes = getEntryDurationMinutes(e);
+        if (!minutes) return null;
+        const date = new Date(e.timestamp);
+        const startHour = date.getHours() + date.getMinutes() / 60;
+        const endHour = startHour + minutes / 60;
+        return {
+          x1: startHour,
+          x2: Math.min(endHour, timeRange.endHour),
+          hexColor: getMoodHexColor(e.mood, e),
+          mood: e.mood
+        };
+      })
+      .filter(Boolean) as { x1: number; x2: number; hexColor: string; mood: string }[];
+  }, [entries, timeRange.endHour]);
 
   // 获取当前小时用于显示参考线
   const currentHour = new Date().getHours() + new Date().getMinutes() / 60;
@@ -346,6 +367,18 @@ const DailyMoodChart: React.FC<Props> = ({ entries, customMoods = [] }) => {
               stroke="rgba(0,0,0,0.1)"
               strokeWidth={0.5}
             />
+            {/* 持续时间色块（背景层，放在 Bar 和 Area 之前） */}
+            {durationRanges.map((range, i) => (
+              <ReferenceArea
+                key={`duration-${i}`}
+                yAxisId="left"
+                x1={range.x1}
+                x2={range.x2}
+                fill={range.hexColor}
+                fillOpacity={0.08}
+                strokeOpacity={0}
+              />
+            ))}
             <Tooltip
                 content={<CustomTooltip />}
                 cursor={{ stroke: '#10b981', strokeWidth: 1, strokeDasharray: '4 4' }}

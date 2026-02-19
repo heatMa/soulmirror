@@ -1,5 +1,6 @@
 import { DiaryEntry, AIAnalysis } from "../types";
 import { MoodOption } from "../constants";
+import { getEntryDurationMinutes } from "../utils/timeUtils";
 
 // ==========================================
 // ⚙️ AI 设置开关 (一键切换)
@@ -268,15 +269,22 @@ export const analyzeMoods = async (entries: DiaryEntry[]): Promise<AIAnalysis> =
     time: new Date(e.timestamp).toLocaleString(),
     mood: e.mood,
     score: e.moodScore,
-    content: e.content
+    content: e.content,
+    durationMinutes: getEntryDurationMinutes(e)
   }));
 
   const promptText = `
     以下是用户最近的一系列心情日记记录：
     ${JSON.stringify(entriesSummary, null, 2)}
 
+    【数据说明】
+    - durationMinutes 表示该情绪持续的时间（分钟），null 表示用户未记录持续时间。
+    - 持续时间越长的情绪，对用户的整体状态影响越大，分析时应给予更高权重。
+      例如"焦虑持续了3小时"和"焦虑闪过10分钟"对用户的消耗完全不同。
+
     请分析用户的心情"晴雨表"。
     识别出用户心情较好的时间段和突发的情绪低谷。
+    如果某条记录有持续时间，请在分析中体现其时间维度的影响。
     给出最真诚、有用的建议。
 
     【重点】：请用一个最有神韵的汉字或一个简短的词（不超过3个字）来形容这段时间的状态（例如：静、破茧、小确幸、乱、沉淀），放入 keyword 字段。
