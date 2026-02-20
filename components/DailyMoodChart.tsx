@@ -368,17 +368,20 @@ const DailyMoodChart: React.FC<Props> = ({ entries, customMoods = [] }) => {
               strokeWidth={0.5}
             />
             {/* 持续时间色块（背景层，放在 Bar 和 Area 之前） */}
-            {durationRanges.map((range, i) => (
-              <ReferenceArea
-                key={`duration-${i}`}
-                yAxisId="left"
-                x1={range.x1}
-                x2={range.x2}
-                fill={range.hexColor}
-                fillOpacity={0.08}
-                strokeOpacity={0}
-              />
-            ))}
+            {durationRanges.map((range, i) => {
+              const ReferenceAreaAny = ReferenceArea as any;
+              return (
+                <ReferenceAreaAny
+                  key={`duration-${i}`}
+                  yAxisId="left"
+                  x1={range.x1}
+                  x2={range.x2}
+                  fill={range.hexColor}
+                  fillOpacity={0.08}
+                  strokeOpacity={0}
+                />
+              );
+            })}
             <Tooltip
                 content={<CustomTooltip />}
                 cursor={{ stroke: '#10b981', strokeWidth: 1, strokeDasharray: '4 4' }}

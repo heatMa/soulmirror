@@ -1,6 +1,6 @@
 import { DiaryEntry, AIAnalysis } from "../types";
 import { MoodOption } from "../constants";
-import { getEntryDurationMinutes } from "../utils/timeUtils";
+import { getEntryDurationMinutes, formatDuration } from "../utils/timeUtils";
 
 // ==========================================
 // ⚙️ AI 设置开关 (一键切换)
@@ -23,11 +23,11 @@ const GEMINI_API_KEY = "YOUR_GEMINI_API_KEY_HERE";
 
 // Cloudflare Pages Function 代理地址 (同域名，避免跨域问题)
 // 优先使用环境变量配置，否则使用同域名的 /api/chat 路由
-const AI_PROXY_URL = import.meta.env.VITE_AI_PROXY_URL || "/api/chat";
+const AI_PROXY_URL = (import.meta as any).env?.VITE_AI_PROXY_URL || "/api/chat";
 
 // DeepSeek 直连地址 (用于本地开发或 Android 原生应用)
 const DEEPSEEK_DIRECT_URL = "https://api.deepseek.com/chat/completions";
-const DEEPSEEK_API_KEY = import.meta.env.VITE_DEEPSEEK_API_KEY || "";
+const DEEPSEEK_API_KEY = (import.meta as any).env?.VITE_DEEPSEEK_API_KEY || "";
 
 // 是否使用代理模式：有 API Key 时直连，否则使用代理
 const USE_PROXY = !DEEPSEEK_API_KEY;
@@ -634,7 +634,9 @@ export const generateDailyDeepReflection = async (
       const time = new Date(e.timestamp).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
       const emoji = e.moodEmoji || '📝';
       const contentText = e.content.replace(/<[^>]*>/g, '');
-      return `${emoji} ${e.mood} (${time}, ${e.moodScore}分)\n${contentText}`;
+      const duration = getEntryDurationMinutes(e);
+      const durationStr = duration ? `, 持续${formatDuration(duration)}` : '';
+      return `${emoji} ${e.mood} (${time}, ${e.moodScore}分${durationStr})\n${contentText}`;
     }).join('\n\n');
   }
 
@@ -658,25 +660,28 @@ export const generateDailyDeepReflection = async (
 你是一位精准的情绪模式识别专家。你擅长从碎片化的心情记录中发现用户的情绪波动规律、时间分布特征，以及背后的触发因素。
 
 # Input Context
-用户今天记录了 ${sortedEntries.length} 次心情，包含时间、情绪标签、评分和简短记录。
+用户今天记录了 ${sortedEntries.length} 次心情，包含时间、情绪标签、评分、持续时间和简短记录。
 
 # Analysis Focus
-1. **时间规律**：情绪波动在什么时间段最明显？
-2. **触发因素**：哪些事件或场景反复触发情绪波动？
-3. **重复模式**：是否存在同一个问题反复出现的情况？
+1. **情绪黑洞**：重点关注持续时间超过1小时的负面情绪（评分≤5），这些是最消耗能量的"黑洞"
+2. **时间规律**：情绪波动在什么时间段最明显？
+3. **触发因素**：哪些事件或场景反复触发情绪波动？
+4. **重复模式**：是否存在同一个问题反复出现的情况？
 
 # Output Format & Constraints
-- **总字数**：150 字以内
+- **总字数**：180 字以内
 - **语气**：精准、直接，禁止安慰性废话
 - **结构**：
-  1. **问题识别**（30-40字）：今天情绪波动的核心特征是什么？
-  2. **根因分析**（40-50字）：为什么会出现这种模式？是时间规律、触发事件、还是思维惯性？
-  3. **具体行动**（40-50字）：给出1条可执行的微小改变建议
-  4. **一句提醒**（15-20字）：一句警醒的话
+  1. **问题识别**（30-40字）：今天情绪波动的核心特征是什么？是否存在"情绪黑洞"（长时间负面情绪）？
+  2. **情绪黑洞分析**（30-40字）：如果有长时间负面情绪，分析其触发原因和持续机制
+  3. **根因分析**（30-40字）：为什么会出现这种模式？是时间规律、触发事件、还是思维惯性？
+  4. **具体行动**（30-40字）：给出1条可执行的微小改变建议，重点针对如何缩短负面情绪持续时间
+  5. **一句提醒**（15-20字）：一句警醒的话
 
 # Key Principles
+- **重点关注**：持续超过1小时的负面情绪，它们对用户状态的消耗远大于短暂的情绪波动
 - 重点识别：**重复性情绪波动**、**分析麻痹**（想太多不行动）、**情绪触发点**
-- 不要泛泛而谈，要结合具体的时间和事件
+- 不要泛泛而谈，要结合具体的时间、持续时间和事件
 - 避免"深呼吸"、"放松心情"等无用建议`;
   } else {
     // 仅日记 或 日记+心情记录模式：统一使用新的精简结构

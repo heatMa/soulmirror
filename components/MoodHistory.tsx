@@ -50,7 +50,7 @@ const MoodHistory: React.FC<Props> = ({ entries, allMoods, selectedMood, timeRan
   // 计算最大次数用于透明度计算
   const maxCount = useMemo(() => {
     let max = 0;
-    Object.values(entriesByDate).forEach(dayEntries => {
+    Object.values(entriesByDate).forEach((dayEntries: DiaryEntry[]) => {
       if (dayEntries.length > max) max = dayEntries.length;
     });
     return max || 1;

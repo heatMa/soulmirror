@@ -82,7 +82,7 @@ export async function scheduleWeeklyReportNotification(): Promise<void> {
       ]
     });
     
-    console.log('周报通知已设置:', nextMonday.toLocaleString());
+    console.log('周报通知已设置:', nextSunday.toLocaleString());
   } catch (error) {
     console.error('设置周报通知失败:', error);
   }

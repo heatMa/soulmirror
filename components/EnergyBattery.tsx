@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { DiaryEntry } from '../types';
 import { MOOD_OPTIONS, MoodOption, getHexFromTailwind } from '../constants';
 import { DAILY_STARTING_ENERGY } from '../utils/energyUtils';
+import { getEntryDurationMinutes, formatDuration } from '../utils/timeUtils';
 
 interface Props {
   entries: DiaryEntry[];  // 今日的条目
@@ -18,6 +19,7 @@ interface BlockData {
   time: string;
   content: string;
   widthPx: number;
+  durationMinutes: number | null;
 }
 
 const EnergyBattery: React.FC<Props> = ({ entries, allEntries, customMoods = [] }) => {
@@ -148,6 +150,14 @@ const EnergyBattery: React.FC<Props> = ({ entries, allEntries, customMoods = [] 
       const hexColor = entry.moodHexColor || config?.hexColor || getHexFromTailwind(config?.color || 'bg-gray-400');
       // 使用 energyDelta（能量变化值），如果没有则用 moodScore
       const score = entry.energyDelta ?? entry.moodScore ?? 1;
+      
+      // 获取持续时间（分钟）
+      const durationMinutes = getEntryDurationMinutes(entry);
+      
+      // 计算持续时间权重：持续时间越长，块越宽
+      // 公式：基础宽度 + 持续时间加成（最长3倍加成）
+      const durationWeight = durationMinutes ? Math.min(durationMinutes / 60, 3) : 0;
+      const adjustedScore = Math.abs(score) * (1 + durationWeight * 0.3);
 
       return {
         id: entry.id,
@@ -160,7 +170,8 @@ const EnergyBattery: React.FC<Props> = ({ entries, allEntries, customMoods = [] 
           minute: '2-digit'
         }),
         content: entry.content,
-        widthPx: Math.abs(score) * pxPerScore  // 使用绝对值计算宽度
+        widthPx: adjustedScore * pxPerScore,  // 使用调整后的分数计算宽度
+        durationMinutes
       };
     });
   }, [entries, allMoodConfigs, pxPerScore]);
@@ -232,7 +243,7 @@ const EnergyBattery: React.FC<Props> = ({ entries, allEntries, customMoods = [] 
               width: `${block.widthPx * scaleFactor}px`,
               backgroundColor: block.hexColor,
             }}
-            title={`${block.mood} ${block.score.toFixed(1)}分`}
+            title={`${block.mood} ${block.score.toFixed(1)}分${block.durationMinutes ? ` · ${formatDuration(block.durationMinutes)}` : ''}`}
           />
         ))}
       </div>
@@ -251,6 +262,9 @@ const EnergyBattery: React.FC<Props> = ({ entries, allEntries, customMoods = [] 
               {selectedBlock.mood}
             </span>
             <span className="text-xs text-gray-400">{selectedBlock.time}</span>
+            {selectedBlock.durationMinutes && (
+              <span className="text-xs text-gray-400">· {formatDuration(selectedBlock.durationMinutes)}</span>
+            )}
             <span
               className="text-xs font-bold ml-auto"
               style={{ color: selectedBlock.hexColor }}

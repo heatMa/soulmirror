@@ -87,6 +87,29 @@ class DatabaseService {
     }
   }
 
+  // ==================== 周报系统方法声明 ====================
+  saveWeeklyReport(report: WeeklyReport): Promise<void> {
+    throw new Error('Method not implemented');
+  }
+  getWeeklyReport(weekKey: string): Promise<WeeklyReport | null> {
+    throw new Error('Method not implemented');
+  }
+  getAllWeeklyReports(): Promise<WeeklyReport[]> {
+    throw new Error('Method not implemented');
+  }
+  markReportAsViewed(weekKey: string): Promise<void> {
+    throw new Error('Method not implemented');
+  }
+  acceptExperiment(weekKey: string): Promise<void> {
+    throw new Error('Method not implemented');
+  }
+  completeExperiment(weekKey: string): Promise<void> {
+    throw new Error('Method not implemented');
+  }
+  deleteWeeklyReport(weekKey: string): Promise<void> {
+    throw new Error('Method not implemented');
+  }
+
   /**
    * 初始化数据库连接
    */
@@ -433,7 +456,7 @@ class DatabaseService {
       duration: row.duration as number | undefined,
       isActive: Boolean(row.is_active),
       energyDelta: row.energy_delta as number | undefined,
-      scoreVersion: (row.score_version as string) || 'v1'
+      scoreVersion: ((row.score_version as string) || 'v1') as 'v1' | 'v2'
     };
   }
 
@@ -909,18 +932,6 @@ class DatabaseService {
 // 注意：这里使用原型扩展方式，保持类的单一性
 
 const WEEKLY_REPORTS_KEY = 'soulmirror_weekly_reports';
-
-declare module './databaseService' {
-  interface DatabaseService {
-    saveWeeklyReport(report: WeeklyReport): Promise<void>;
-    getWeeklyReport(weekKey: string): Promise<WeeklyReport | null>;
-    getAllWeeklyReports(): Promise<WeeklyReport[]>;
-    markReportAsViewed(weekKey: string): Promise<void>;
-    acceptExperiment(weekKey: string): Promise<void>;
-    completeExperiment(weekKey: string): Promise<void>;
-    deleteWeeklyReport(weekKey: string): Promise<void>;
-  }
-}
 
 // 保存周报
 DatabaseService.prototype.saveWeeklyReport = async function(report: WeeklyReport): Promise<void> {

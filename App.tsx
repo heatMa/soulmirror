@@ -72,6 +72,37 @@ const App: React.FC = () => {
         setDailyNotes(loadedNotes);
         setCustomMoods(loadedCustomMoods);
         
+        // 加载或生成周报（失败不影响主功能）
+        try {
+          // 获取当前周的周key
+          const weekKey = getWeekKeyForDate();
+          
+          // 先尝试从数据库加载已有周报
+          const existingReport = await databaseService.getWeeklyReport(weekKey);
+          
+          if (existingReport) {
+            // 已有周报，直接使用
+            setCurrentWeekReport(existingReport);
+          } else {
+            // 检查是否满足生成条件（到周日且记录数≥5）
+            const today = new Date();
+            const isSunday = today.getDay() === 0;
+            const weekEntries = loadedEntries.filter(e => {
+              const entryWeekKey = getWeekKeyForDate(new Date(e.timestamp));
+              return entryWeekKey === weekKey;
+            });
+            
+            if (isSunday && weekEntries.length >= 5) {
+              // 生成新周报
+              const newReport = await generateWeeklyReport(weekKey);
+              await databaseService.saveWeeklyReport(newReport);
+              setCurrentWeekReport(newReport);
+            }
+          }
+        } catch (reportError) {
+          console.error('周报加载失败:', reportError);
+        }
+        
         // 初始化通知系统（Android，失败不影响主功能）
         try {
           await initializeNotifications();

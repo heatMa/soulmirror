@@ -272,7 +272,7 @@ const Dashboard: React.FC<Props> = ({ entries, onDataRestored }) => {
             path: filename,
             data: jsonStr,
             directory: Directory.Documents,
-            encoding: 'utf8'
+            encoding: undefined
           });
 
           console.log('文件保存成功:', result.uri);
