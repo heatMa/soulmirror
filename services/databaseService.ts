@@ -1,6 +1,6 @@
 import { CapacitorSQLite, SQLiteConnection, SQLiteDBConnection } from '@capacitor-community/sqlite';
 import { Capacitor } from '@capacitor/core';
-import { DiaryEntry, BackupData, ImportResult, WeeklySummary } from '../types';
+import { DiaryEntry, BackupData, ImportResult, WeeklySummary, WeeklyReport } from '../types';
 import { MoodOption } from '../constants';
 
 // 数据库名称和版本
@@ -904,6 +904,159 @@ class DatabaseService {
     }
   }
 }
+
+// ==================== 周报系统操作 ====================
+// 注意：这里使用原型扩展方式，保持类的单一性
+
+const WEEKLY_REPORTS_KEY = 'soulmirror_weekly_reports';
+
+declare module './databaseService' {
+  interface DatabaseService {
+    saveWeeklyReport(report: WeeklyReport): Promise<void>;
+    getWeeklyReport(weekKey: string): Promise<WeeklyReport | null>;
+    getAllWeeklyReports(): Promise<WeeklyReport[]>;
+    markReportAsViewed(weekKey: string): Promise<void>;
+    acceptExperiment(weekKey: string): Promise<void>;
+    completeExperiment(weekKey: string): Promise<void>;
+    deleteWeeklyReport(weekKey: string): Promise<void>;
+  }
+}
+
+// 保存周报
+DatabaseService.prototype.saveWeeklyReport = async function(report: WeeklyReport): Promise<void> {
+  await this.ensureInitialized();
+
+  if (this.isNative && this.db) {
+    // 检查表是否存在，不存在则创建
+    await this.db.execute(`
+      CREATE TABLE IF NOT EXISTS weekly_reports (
+        week_key TEXT PRIMARY KEY,
+        data TEXT NOT NULL,
+        generated_at INTEGER NOT NULL,
+        viewed_at INTEGER,
+        experiment_accepted INTEGER DEFAULT 0,
+        experiment_completed INTEGER DEFAULT 0
+      )
+    `);
+    
+    await this.db.run(
+      `INSERT OR REPLACE INTO weekly_reports (week_key, data, generated_at, viewed_at, experiment_accepted, experiment_completed)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+      [
+        report.weekKey,
+        JSON.stringify(report),
+        report.generatedAt,
+        report.tracking?.viewedAt || null,
+        report.tracking?.experimentAccepted ? 1 : 0,
+        report.tracking?.experimentCompleted ? 1 : 0
+      ]
+    );
+  } else {
+    const data = localStorage.getItem(WEEKLY_REPORTS_KEY);
+    const reports: Record<string, WeeklyReport> = data ? JSON.parse(data) : {};
+    reports[report.weekKey] = report;
+    localStorage.setItem(WEEKLY_REPORTS_KEY, JSON.stringify(reports));
+  }
+};
+
+// 获取指定周的周报
+DatabaseService.prototype.getWeeklyReport = async function(weekKey: string): Promise<WeeklyReport | null> {
+  await this.ensureInitialized();
+
+  if (this.isNative && this.db) {
+    const result = await this.db.query('SELECT * FROM weekly_reports WHERE week_key = ?', [weekKey]);
+    if (result.values && result.values.length > 0) {
+      const row = result.values[0];
+      const report: WeeklyReport = JSON.parse(row.data as string);
+      report.tracking = {
+        viewedAt: row.viewed_at as number | undefined,
+        experimentAccepted: Boolean(row.experiment_accepted),
+        experimentCompleted: Boolean(row.experiment_completed)
+      };
+      return report;
+    }
+    return null;
+  } else {
+    const data = localStorage.getItem(WEEKLY_REPORTS_KEY);
+    const reports: Record<string, WeeklyReport> = data ? JSON.parse(data) : {};
+    return reports[weekKey] || null;
+  }
+};
+
+// 获取所有周报
+DatabaseService.prototype.getAllWeeklyReports = async function(): Promise<WeeklyReport[]> {
+  await this.ensureInitialized();
+
+  if (this.isNative && this.db) {
+    const result = await this.db.query('SELECT * FROM weekly_reports ORDER BY week_key DESC');
+    return (result.values || []).map((row: any) => {
+      const report: WeeklyReport = JSON.parse(row.data);
+      report.tracking = {
+        viewedAt: row.viewed_at,
+        experimentAccepted: Boolean(row.experiment_accepted),
+        experimentCompleted: Boolean(row.experiment_completed)
+      };
+      return report;
+    });
+  } else {
+    const data = localStorage.getItem(WEEKLY_REPORTS_KEY);
+    const reports: Record<string, WeeklyReport> = data ? JSON.parse(data) : {};
+    return Object.values(reports).sort((a, b) => b.weekKey.localeCompare(a.weekKey));
+  }
+};
+
+// 标记周报为已读
+DatabaseService.prototype.markReportAsViewed = async function(weekKey: string): Promise<void> {
+  await this.ensureInitialized();
+  const report = await this.getWeeklyReport(weekKey);
+  if (report) {
+    report.tracking = {
+      ...report.tracking,
+      viewedAt: Date.now()
+    };
+    await this.saveWeeklyReport(report);
+  }
+};
+
+// 接受实验
+DatabaseService.prototype.acceptExperiment = async function(weekKey: string): Promise<void> {
+  await this.ensureInitialized();
+  const report = await this.getWeeklyReport(weekKey);
+  if (report) {
+    report.tracking = {
+      ...report.tracking,
+      experimentAccepted: true
+    };
+    await this.saveWeeklyReport(report);
+  }
+};
+
+// 完成实验
+DatabaseService.prototype.completeExperiment = async function(weekKey: string): Promise<void> {
+  await this.ensureInitialized();
+  const report = await this.getWeeklyReport(weekKey);
+  if (report) {
+    report.tracking = {
+      ...report.tracking,
+      experimentCompleted: true
+    };
+    await this.saveWeeklyReport(report);
+  }
+};
+
+// 删除周报
+DatabaseService.prototype.deleteWeeklyReport = async function(weekKey: string): Promise<void> {
+  await this.ensureInitialized();
+
+  if (this.isNative && this.db) {
+    await this.db.run('DELETE FROM weekly_reports WHERE week_key = ?', [weekKey]);
+  } else {
+    const data = localStorage.getItem(WEEKLY_REPORTS_KEY);
+    const reports: Record<string, WeeklyReport> = data ? JSON.parse(data) : {};
+    delete reports[weekKey];
+    localStorage.setItem(WEEKLY_REPORTS_KEY, JSON.stringify(reports));
+  }
+};
 
 // 导出单例实例
 export const databaseService = new DatabaseService();

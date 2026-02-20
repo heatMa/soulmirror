@@ -71,3 +71,73 @@ export interface ImportResult {
   moodsImported: number;
   errors: string[];
 }
+
+// ==================== 周报系统类型定义 ====================
+
+export interface WeeklyReport {
+  id: string;
+  weekKey: string;           // '2025-W08'
+  weekRange: {
+    start: string;           // '2025-02-17'
+    end: string;             // '2025-02-23'
+  };
+  generatedAt: number;
+  
+  content: {
+    // 本周快照
+    snapshot: {
+      totalEntries: number;
+      totalDurationMinutes: number;
+      avgEnergyDelta: number;
+      dominantMood: string;
+      energyTrend: 'up' | 'down' | 'stable';
+      peakDay: string;
+      peakEnergy: number;
+      valleyDay: string;
+      valleyEnergy: number;
+    };
+    
+    // 教练观察
+    observation: {
+      headline: string;
+      body: string;
+      pattern?: string;
+    };
+    
+    // 一个实验
+    experiment: {
+      title: string;
+      instruction: string;
+      duration: string;
+      expectedOutcome: string;
+    };
+    
+    // 本周推荐
+    recommendation: {
+      type: 'book' | 'concept' | 'video' | 'podcast';
+      title: string;
+      author?: string;
+      why: string;
+      link?: string;
+    };
+    
+    // 数据可视化
+    chartData: {
+      dailyEnergy: { day: string; value: number; date: string }[];
+      moodDistribution: { mood: string; minutes: number; color: string }[];
+      timeQuality: {
+        highEnergyHours: number;
+        lowEnergyHours: number;
+        recoveryEfficiency: number;
+      };
+    };
+  };
+  
+  // 追踪信息
+  tracking?: {
+    viewedAt?: number;
+    experimentAccepted: boolean;
+    experimentCompleted?: boolean;
+    dismissed?: boolean;
+  };
+}

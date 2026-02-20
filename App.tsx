@@ -18,12 +18,8 @@ import { evaluateMoodScore, generateAiReply, generateRegulationSuggestions } fro
 import { databaseService } from './services/databaseService';
 import { getEnergyAfterEntry } from './utils/energyUtils';
 import { 
-  getOrGenerateCurrentReport, 
-  getCurrentWeekKey, 
   getWeekKeyForDate,
   getWeeklyReportStatusForDate,
-  isWeeklyReportGenerationTime,
-  getWeeklyReportStatus,
   regenerateWeeklyReport,
   generateWeeklyReport
 } from './services/reportService';
