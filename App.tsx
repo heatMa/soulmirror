@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { DiaryEntry, ViewMode } from './types';
+import { DiaryEntry, ViewMode, WeeklyReport } from './types';
 import DiaryEntryForm from './components/DiaryEntryForm';
 import Dashboard from './components/Dashboard';
 import CalendarStrip from './components/CalendarStrip';
@@ -10,10 +10,24 @@ import WeeklyGoal from './components/WeeklyGoal';
 import TimelineItem from './components/TimelineItem';
 import DeepReflectionSection from './components/DeepReflectionSection';
 import Statistics from './components/Statistics';
+import WeeklyReportCard from './components/WeeklyReportCard';
+import WeeklyReportView from './components/WeeklyReportView';
+import WeeklyReportPreview from './components/WeeklyReportPreview';
 import { ICONS, MOOD_OPTIONS, MoodOption, getEffectiveCustomMoods } from './constants';
 import { evaluateMoodScore, generateAiReply, generateRegulationSuggestions } from './services/geminiService';
 import { databaseService } from './services/databaseService';
 import { getEnergyAfterEntry } from './utils/energyUtils';
+import { 
+  getOrGenerateCurrentReport, 
+  getCurrentWeekKey, 
+  getWeekKeyForDate,
+  getWeeklyReportStatusForDate,
+  isWeeklyReportGenerationTime,
+  getWeeklyReportStatus,
+  regenerateWeeklyReport,
+  generateWeeklyReport
+} from './services/reportService';
+import { initializeNotifications } from './services/notificationService';
 
 const App: React.FC = () => {
   const [entries, setEntries] = useState<DiaryEntry[]>([]);
@@ -27,6 +41,15 @@ const App: React.FC = () => {
   const [isCopied, setIsCopied] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [dbError, setDbError] = useState<string | null>(null);
+  
+  // 周报相关状态
+  const [currentWeekReport, setCurrentWeekReport] = useState<WeeklyReport | null>(null);
+  const [showReportView, setShowReportView] = useState(false);
+  const [weeklyReportStatus, setWeeklyReportStatus] = useState<{
+    canGenerate: boolean;
+    entryCount: number;
+    isGenerationTime: boolean;
+  } | null>(null);
 
   // 初始化数据库并加载数据
   useEffect(() => {
@@ -52,6 +75,13 @@ const App: React.FC = () => {
         setEntries(loadedEntries);
         setDailyNotes(loadedNotes);
         setCustomMoods(loadedCustomMoods);
+        
+        // 初始化通知系统（Android，失败不影响主功能）
+        try {
+          await initializeNotifications();
+        } catch (notifError) {
+          console.error('通知初始化失败:', notifError);
+        }
         
         console.log('应用数据加载完成');
       } catch (error) {
@@ -102,6 +132,30 @@ const App: React.FC = () => {
 
     return () => clearInterval(interval);
   }, []);
+
+  // 根据选中的日期加载对应周的周报
+  useEffect(() => {
+    const loadWeeklyReportForDate = async () => {
+      try {
+        const weekKey = getWeekKeyForDate(selectedDate);
+        const report = await databaseService.getWeeklyReport(weekKey);
+        
+        if (report) {
+          setCurrentWeekReport(report);
+          setWeeklyReportStatus(null);
+        } else {
+          // 没有周报，检查是否可以生成预览
+          const status = await getWeeklyReportStatusForDate(selectedDate);
+          setWeeklyReportStatus(status);
+          setCurrentWeekReport(null);
+        }
+      } catch (error) {
+        console.error('加载周报失败:', error);
+      }
+    };
+
+    loadWeeklyReportForDate();
+  }, [selectedDate]);
 
   // 保存日记条目
   const handleSaveEntry = useCallback(async (formData: Omit<DiaryEntry, 'id' | 'timestamp'> & { id?: string, timestamp?: number }) => {
@@ -483,7 +537,8 @@ const App: React.FC = () => {
         <>
           <CalendarStrip 
             selectedDate={selectedDate} 
-            onSelectDate={setSelectedDate} 
+            onSelectDate={setSelectedDate}
+            entries={entries}
           />
           
           <main className="flex-1 px-2 pt-4 pb-28 overflow-y-auto no-scrollbar">
@@ -512,6 +567,50 @@ const App: React.FC = () => {
             {timelineEntries.length > 0 && (
               <div className="mb-4 h-48 animate-in fade-in slide-in-from-bottom-6 duration-700">
                  <DailyMoodChart entries={timelineEntries} customMoods={effectiveCustomMoods} />
+              </div>
+            )}
+
+            {/* Weekly Report Card - 周报入口 */}
+            {currentWeekReport ? (
+              <div className="animate-in fade-in slide-in-from-bottom-5 duration-700">
+                <WeeklyReportCard 
+                  report={currentWeekReport}
+                  onClick={() => {
+                    databaseService.markReportAsViewed(currentWeekReport.weekKey);
+                    setShowReportView(true);
+                  }}
+                  onRegenerate={async (weekKey: string) => {
+                    try {
+                      const newReport = await regenerateWeeklyReport(weekKey);
+                      if (newReport) {
+                        setCurrentWeekReport(newReport);
+                      }
+                    } catch (error) {
+                      console.error('重新生成周报失败:', error);
+                      alert('重新生成失败，请重试');
+                    }
+                  }}
+                />
+              </div>
+            ) : weeklyReportStatus && (
+              <div className="animate-in fade-in slide-in-from-bottom-5 duration-700">
+                <WeeklyReportPreview 
+                  entryCount={weeklyReportStatus.entryCount}
+                  minEntries={3}
+                  weekKey={weeklyReportStatus.weekKey}
+                  onGenerate={async (weekKey: string) => {
+                    try {
+                      const report = await generateWeeklyReport(weekKey);
+                      if (report) {
+                        setCurrentWeekReport(report);
+                        setWeeklyReportStatus(null);
+                      }
+                    } catch (error) {
+                      console.error('生成周报失败:', error);
+                      throw error;
+                    }
+                  }}
+                />
               </div>
             )}
 
@@ -638,6 +737,24 @@ const App: React.FC = () => {
           initialData={editingEntry}
           onSave={handleSaveEntry} 
           onClose={() => setShowAddForm(false)} 
+        />
+      )}
+      
+      {/* 周报详情页 */}
+      {showReportView && currentWeekReport && (
+        <WeeklyReportView 
+          report={currentWeekReport}
+          onClose={() => setShowReportView(false)}
+          onExperimentAccept={() => {
+            // 更新本地状态
+            setCurrentWeekReport(prev => prev ? {
+              ...prev,
+              tracking: {
+                ...prev.tracking,
+                experimentAccepted: true
+              }
+            } : null);
+          }}
         />
       )}
     </div>

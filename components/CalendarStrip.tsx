@@ -1,12 +1,14 @@
 
 import React, { useState, useEffect } from 'react';
+import { DiaryEntry } from '../types';
 
 interface Props {
   selectedDate: Date;
   onSelectDate: (date: Date) => void;
+  entries?: DiaryEntry[];
 }
 
-const CalendarStrip: React.FC<Props> = ({ selectedDate, onSelectDate }) => {
+const CalendarStrip: React.FC<Props> = ({ selectedDate, onSelectDate, entries = [] }) => {
   const [currentWeekStart, setCurrentWeekStart] = useState<Date>(() => {
     const d = new Date(selectedDate);
     const day = d.getDay(); 
@@ -51,6 +53,23 @@ const CalendarStrip: React.FC<Props> = ({ selectedDate, onSelectDate }) => {
            d1.getFullYear() === d2.getFullYear();
   };
 
+  // 获取某一天的记录列表
+  const getEntriesForDate = (date: Date): DiaryEntry[] => {
+    return entries.filter(entry => {
+      const entryDate = new Date(entry.timestamp);
+      return isSameDay(entryDate, date);
+    });
+  };
+
+  // 获取某一天的代表颜色（取第一条记录的心情颜色）
+  const getDateColor = (date: Date): string | null => {
+    const dayEntries = getEntriesForDate(date);
+    if (dayEntries.length === 0) return null;
+    
+    // 返回第一条记录的心情颜色，如果没有则使用默认颜色
+    return dayEntries[0].moodHexColor || '#3B82F6';
+  };
+
   return (
     <div className="pt-safe-top pb-2 px-4 sticky top-0 z-30 transition-all duration-300">
       <div className="glass rounded-[2rem] p-4 shadow-sm">
@@ -78,6 +97,8 @@ const CalendarStrip: React.FC<Props> = ({ selectedDate, onSelectDate }) => {
           {weekDays.map((date, idx) => {
             const isSelected = isSameDay(date, selectedDate);
             const isToday = isSameDay(date, new Date());
+            const hasEntries = getEntriesForDate(date).length > 0;
+            const dateColor = getDateColor(date);
             
             return (
               <button 
@@ -97,11 +118,17 @@ const CalendarStrip: React.FC<Props> = ({ selectedDate, onSelectDate }) => {
                 </span>
                 
                 <div className="h-1 flex items-center justify-center">
-                  {isToday && !isSelected && (
-                    <div className="w-1 h-1 bg-rose-400 rounded-full"></div>
-                  )}
                   {isSelected && (
                     <div className="w-1 h-1 bg-white rounded-full"></div>
+                  )}
+                  {!isSelected && hasEntries && dateColor && (
+                    <div 
+                      className="w-1 h-1 rounded-full" 
+                      style={{ backgroundColor: dateColor }}
+                    ></div>
+                  )}
+                  {!isSelected && !hasEntries && isToday && (
+                    <div className="w-1 h-1 bg-rose-400 rounded-full"></div>
                   )}
                 </div>
               </button>
