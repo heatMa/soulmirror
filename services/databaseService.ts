@@ -975,6 +975,22 @@ DatabaseService.prototype.getWeeklyReport = async function(weekKey: string): Pro
   await this.ensureInitialized();
 
   if (this.isNative && this.db) {
+    // 确保表存在（避免查询不存在的表报错）
+    try {
+      await this.db.execute(`
+        CREATE TABLE IF NOT EXISTS weekly_reports (
+          week_key TEXT PRIMARY KEY,
+          data TEXT NOT NULL,
+          generated_at INTEGER NOT NULL,
+          viewed_at INTEGER,
+          experiment_accepted INTEGER DEFAULT 0,
+          experiment_completed INTEGER DEFAULT 0
+        )
+      `);
+    } catch (e) {
+      // 表已存在或创建失败，继续查询
+    }
+    
     const result = await this.db.query('SELECT * FROM weekly_reports WHERE week_key = ?', [weekKey]);
     if (result.values && result.values.length > 0) {
       const row = result.values[0];
@@ -999,6 +1015,22 @@ DatabaseService.prototype.getAllWeeklyReports = async function(): Promise<Weekly
   await this.ensureInitialized();
 
   if (this.isNative && this.db) {
+    // 确保表存在
+    try {
+      await this.db.execute(`
+        CREATE TABLE IF NOT EXISTS weekly_reports (
+          week_key TEXT PRIMARY KEY,
+          data TEXT NOT NULL,
+          generated_at INTEGER NOT NULL,
+          viewed_at INTEGER,
+          experiment_accepted INTEGER DEFAULT 0,
+          experiment_completed INTEGER DEFAULT 0
+        )
+      `);
+    } catch (e) {
+      // 表已存在或创建失败，继续查询
+    }
+    
     const result = await this.db.query('SELECT * FROM weekly_reports ORDER BY week_key DESC');
     return (result.values || []).map((row: any) => {
       const report: WeeklyReport = JSON.parse(row.data);
@@ -1060,6 +1092,22 @@ DatabaseService.prototype.deleteWeeklyReport = async function(weekKey: string): 
   await this.ensureInitialized();
 
   if (this.isNative && this.db) {
+    // 确保表存在
+    try {
+      await this.db.execute(`
+        CREATE TABLE IF NOT EXISTS weekly_reports (
+          week_key TEXT PRIMARY KEY,
+          data TEXT NOT NULL,
+          generated_at INTEGER NOT NULL,
+          viewed_at INTEGER,
+          experiment_accepted INTEGER DEFAULT 0,
+          experiment_completed INTEGER DEFAULT 0
+        )
+      `);
+    } catch (e) {
+      // 表已存在或创建失败，继续
+    }
+    
     await this.db.run('DELETE FROM weekly_reports WHERE week_key = ?', [weekKey]);
   } else {
     const data = localStorage.getItem(WEEKLY_REPORTS_KEY);

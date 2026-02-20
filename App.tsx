@@ -1,5 +1,6 @@
 
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { App as CapacitorApp } from '@capacitor/app';
 import { DiaryEntry, ViewMode, WeeklyReport } from './types';
 import DiaryEntryForm from './components/DiaryEntryForm';
 import Dashboard from './components/Dashboard';
@@ -45,6 +46,7 @@ const App: React.FC = () => {
     canGenerate: boolean;
     entryCount: number;
     isGenerationTime: boolean;
+    weekKey: string;
   } | null>(null);
 
   // 初始化数据库并加载数据
@@ -71,37 +73,6 @@ const App: React.FC = () => {
         setEntries(loadedEntries);
         setDailyNotes(loadedNotes);
         setCustomMoods(loadedCustomMoods);
-        
-        // 加载或生成周报（失败不影响主功能）
-        try {
-          // 获取当前周的周key
-          const weekKey = getWeekKeyForDate();
-          
-          // 先尝试从数据库加载已有周报
-          const existingReport = await databaseService.getWeeklyReport(weekKey);
-          
-          if (existingReport) {
-            // 已有周报，直接使用
-            setCurrentWeekReport(existingReport);
-          } else {
-            // 检查是否满足生成条件（到周日且记录数≥5）
-            const today = new Date();
-            const isSunday = today.getDay() === 0;
-            const weekEntries = loadedEntries.filter(e => {
-              const entryWeekKey = getWeekKeyForDate(new Date(e.timestamp));
-              return entryWeekKey === weekKey;
-            });
-            
-            if (isSunday && weekEntries.length >= 5) {
-              // 生成新周报
-              const newReport = await generateWeeklyReport(weekKey);
-              await databaseService.saveWeeklyReport(newReport);
-              setCurrentWeekReport(newReport);
-            }
-          }
-        } catch (reportError) {
-          console.error('周报加载失败:', reportError);
-        }
         
         // 初始化通知系统（Android，失败不影响主功能）
         try {
@@ -159,6 +130,40 @@ const App: React.FC = () => {
 
     return () => clearInterval(interval);
   }, []);
+
+  // 处理安卓返回键/手势返回
+  useEffect(() => {
+    // 只在原生平台（Android）注册返回事件
+    const isNative = typeof (window as any).Capacitor !== 'undefined';
+    if (!isNative) return;
+
+    const backButtonListener = CapacitorApp.addListener('backButton', ({ canGoBack }) => {
+      // 优先级1：如果周报详情页打开，关闭它
+      if (showReportView) {
+        setShowReportView(false);
+        return;
+      }
+      
+      // 优先级2：如果在分析或统计页面，返回时间线
+      if (viewMode !== ViewMode.TIMELINE) {
+        setViewMode(ViewMode.TIMELINE);
+        return;
+      }
+      
+      // 优先级3：如果可以返回（浏览器历史），则返回
+      if (canGoBack) {
+        window.history.back();
+        return;
+      }
+      
+      // 最后：退出应用
+      CapacitorApp.exitApp();
+    });
+
+    return () => {
+      backButtonListener.remove();
+    };
+  }, [showReportView, viewMode]);
 
   // 根据选中的日期加载对应周的周报
   useEffect(() => {

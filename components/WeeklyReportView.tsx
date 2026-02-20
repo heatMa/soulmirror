@@ -47,14 +47,16 @@ const WeeklyReportView: React.FC<Props> = ({ report, onClose, onExperimentAccept
   
   return (
     <div className="fixed inset-0 z-50 bg-white overflow-y-auto">
-      {/* 头部 */}
-      <div className="sticky top-0 bg-white/90 backdrop-blur-sm border-b border-slate-100 px-4 py-3 flex items-center justify-between">
+      {/* 头部 - 增加安全区域和按钮点击区域 */}
+      <div className="sticky top-0 bg-white/90 backdrop-blur-sm border-b border-slate-100 px-4 pt-8 pb-3 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <button 
             onClick={onClose}
-            className="p-2 -ml-2 rounded-full hover:bg-slate-100 transition-colors"
+            className="p-4 -ml-2 rounded-full hover:bg-slate-100 active:bg-slate-200 transition-colors touch-manipulation"
+            style={{ minWidth: '44px', minHeight: '44px' }}
+            aria-label="返回"
           >
-            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-5 h-5">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-6 h-6">
               <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5 8.25 12l7.5-7.5" />
             </svg>
           </button>
