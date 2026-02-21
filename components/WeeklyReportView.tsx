@@ -102,31 +102,69 @@ const WeeklyReportView: React.FC<Props> = ({ report, onClose, onExperimentAccept
           {/* 每日能量走势 */}
           <div className="bg-white rounded-xl p-3 border border-slate-100">
             <div className="text-xs text-slate-500 mb-2">每日能量走势</div>
-            <div className="flex items-end justify-between h-20 gap-1">
-              {report.content.chartData.dailyEnergy.map((day, i) => (
-                <div key={i} className="flex-1 flex flex-col items-center gap-1">
-                  <div 
-                    className="w-full rounded-t-sm transition-all duration-500"
-                    style={{
-                      height: `${Math.max(10, Math.min(100, (day.value + 10) / 20 * 100))}%`,
-                      backgroundColor: getEnergyColor(day.value),
-                      opacity: day.value === 0 ? 0.2 : 0.8
-                    }}
-                  />
-                  <span className="text-[10px] text-slate-400">{day.day.slice(-1)}</span>
-                </div>
-              ))}
-            </div>
-            <div className="flex justify-between mt-2 text-xs text-slate-500">
-              <span>峰值: {report.content.snapshot.peakDay} ({report.content.snapshot.peakEnergy > 0 ? '+' : ''}{report.content.snapshot.peakEnergy})</span>
-              <span>谷值: {report.content.snapshot.valleyDay} ({report.content.snapshot.valleyEnergy > 0 ? '+' : ''}{report.content.snapshot.valleyEnergy})</span>
-            </div>
+            {(() => {
+              const validDays = report.content.chartData.dailyEnergy.filter(d => d.value !== 0);
+              
+              if (report.content.chartData.dailyEnergy.length === 0 || validDays.length === 0) {
+                return (
+                  <div className="h-20 flex flex-col items-center justify-center text-xs text-slate-400 gap-1">
+                    <span>暂无数据</span>
+                    <span className="text-[10px] opacity-70">本周没有情绪记录</span>
+                  </div>
+                );
+              }
+              
+              return (
+                <>
+                  <div className="flex items-end justify-between h-20 gap-1">
+                    {report.content.chartData.dailyEnergy.map((day, i) => {
+                      const heightPercent = Math.max(8, Math.min(92, (day.value + 10) / 20 * 84 + 8));
+                      const hasData = day.value !== 0;
+                      return (
+                        <div key={i} className="flex-1 flex flex-col items-center gap-1">
+                          <div 
+                            className="w-full rounded-t-sm transition-all duration-500 min-h-[4px]"
+                            style={{
+                              height: `${heightPercent}%`,
+                              backgroundColor: !hasData ? '#e2e8f0' : getEnergyColor(day.value),
+                              opacity: !hasData ? 0.3 : 0.9
+                            }}
+                          />
+                          <span className={`text-[10px] ${hasData ? 'text-slate-600 font-medium' : 'text-slate-300'}`}>
+                            {day.day.slice(-1)}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  <div className="flex justify-between mt-2 text-xs text-slate-500">
+                    <span>峰值: {report.content.snapshot.peakDay || '-'} ({report.content.snapshot.peakEnergy > 0 ? '+' : ''}{report.content.snapshot.peakEnergy || 0})</span>
+                    <span>谷值: {report.content.snapshot.valleyDay || '-'} ({report.content.snapshot.valleyEnergy > 0 ? '+' : ''}{report.content.snapshot.valleyEnergy || 0})</span>
+                  </div>
+                </>
+              );
+            })()}
           </div>
           
           {/* 情绪分布 */}
           {report.content.chartData.moodDistribution.length > 0 && (
             <div className="mt-3 bg-white rounded-xl p-3 border border-slate-100">
-              <div className="text-xs text-slate-500 mb-2">情绪时长分布</div>
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs text-slate-500">情绪时长分布</span>
+                <span className="text-[10px] text-slate-400">
+                  {(() => {
+                    const top4Minutes = report.content.chartData.moodDistribution
+                      .slice(0, 4)
+                      .reduce((sum, m) => sum + m.minutes, 0);
+                    const totalMinutes = report.content.snapshot.totalDurationMinutes;
+                    const otherMinutes = totalMinutes - top4Minutes;
+                    if (otherMinutes > 0 && report.content.chartData.moodDistribution.length > 4) {
+                      return `其他 ${Math.round(otherMinutes / 60 * 10) / 10}h`;
+                    }
+                    return null;
+                  })()}
+                </span>
+              </div>
               <div className="space-y-2">
                 {report.content.chartData.moodDistribution.slice(0, 4).map((m, i) => (
                   <div key={i} className="flex items-center gap-2">
@@ -147,6 +185,34 @@ const WeeklyReportView: React.FC<Props> = ({ report, onClose, onExperimentAccept
                     <span className="text-xs text-slate-400">{formatDuration(m.minutes)}</span>
                   </div>
                 ))}
+                {/* 显示「其他」情绪 */}
+                {(() => {
+                  const top4Minutes = report.content.chartData.moodDistribution
+                    .slice(0, 4)
+                    .reduce((sum, m) => sum + m.minutes, 0);
+                  const totalMinutes = report.content.snapshot.totalDurationMinutes;
+                  const otherMinutes = totalMinutes - top4Minutes;
+                  const otherCount = report.content.chartData.moodDistribution.length - 4;
+                  
+                  if (otherMinutes > 0 && otherCount > 0) {
+                    return (
+                      <div className="flex items-center gap-2">
+                        <div className="w-2 h-2 rounded-full bg-slate-300" />
+                        <span className="text-xs text-slate-500 w-12">其他({otherCount})</span>
+                        <div className="flex-1 h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                          <div 
+                            className="h-full rounded-full bg-slate-300"
+                            style={{
+                              width: `${Math.min(100, (otherMinutes / totalMinutes) * 100 * 2)}%`
+                            }}
+                          />
+                        </div>
+                        <span className="text-xs text-slate-400">{formatDuration(otherMinutes)}</span>
+                      </div>
+                    );
+                  }
+                  return null;
+                })()}
               </div>
             </div>
           )}

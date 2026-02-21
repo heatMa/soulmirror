@@ -1,10 +1,10 @@
 
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { DiaryEntry, AIAnalysis, BackupData, ImportResult } from '../types';
+import { DiaryEntry, AIAnalysis, BackupData, ImportResult, MentorType, UserSettings } from '../types';
 import { analyzeMoods } from '../services/geminiService';
 import { databaseService } from '../services/databaseService';
-import { ICONS, MOOD_OPTIONS, MoodOption } from '../constants';
+import { ICONS, MOOD_OPTIONS, MoodOption, MENTORS, DEFAULT_MENTOR } from '../constants';
 import { Capacitor } from '@capacitor/core';
 import { Filesystem, Directory } from '@capacitor/filesystem';
 import { Share } from '@capacitor/share';
@@ -53,6 +53,38 @@ const Dashboard: React.FC<Props> = ({ entries, onDataRestored }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [timeRange, setTimeRange] = useState<TimeRange>('today');
+
+  // 导师系统状态
+  const [selectedMentor, setSelectedMentor] = useState<MentorType>(DEFAULT_MENTOR);
+  const [mentorLoading, setMentorLoading] = useState(false);
+
+  // 加载用户设置（导师选择）
+  useEffect(() => {
+    const loadSettings = async () => {
+      try {
+        const settings = await databaseService.getUserSettings();
+        setSelectedMentor(settings.selectedMentor);
+      } catch (e) {
+        console.error('加载用户设置失败:', e);
+      }
+    };
+    loadSettings();
+  }, []);
+
+  // 切换导师
+  const handleSelectMentor = async (mentor: MentorType) => {
+    if (mentor === selectedMentor) return;
+    
+    setMentorLoading(true);
+    try {
+      await databaseService.saveUserSettings({ selectedMentor: mentor });
+      setSelectedMentor(mentor);
+    } catch (e) {
+      console.error('保存导师设置失败:', e);
+    } finally {
+      setMentorLoading(false);
+    }
+  };
 
   // 切换时间范围或组件挂载时，从数据库加载对应缓存
   useEffect(() => {
@@ -593,6 +625,61 @@ const Dashboard: React.FC<Props> = ({ entries, onDataRestored }) => {
             </div>
           </div>
         )}
+      </section>
+
+      {/* --- Mentor Selection Section --- */}
+      <section className="animate-in fade-in slide-in-from-bottom-8 duration-600">
+        <div className="glass-card rounded-[2rem] p-6">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-sm font-bold text-gray-700 flex items-center gap-2">
+              <span className="text-lg">🎭</span>
+              人生导师
+            </h3>
+            <span className="text-xs text-gray-400">
+              选择一位 AI 人格陪伴你
+            </span>
+          </div>
+          
+          {/* 导师选择网格 */}
+          <div className="grid grid-cols-4 gap-2 mb-4">
+            {(Object.keys(MENTORS) as MentorType[]).map((mentorId) => {
+              const mentor = MENTORS[mentorId];
+              const isSelected = selectedMentor === mentorId;
+              
+              return (
+                <button
+                  key={mentorId}
+                  onClick={() => handleSelectMentor(mentorId)}
+                  disabled={mentorLoading}
+                  className={`p-3 rounded-xl text-center transition-all border ${
+                    isSelected
+                      ? 'bg-indigo-50 border-indigo-400 shadow-sm'
+                      : 'bg-white/50 border-transparent hover:bg-white hover:border-gray-200'
+                  } ${mentorLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
+                >
+                  <div className="text-2xl mb-1">{mentor.avatar}</div>
+                  <div className={`text-xs font-bold ${isSelected ? 'text-indigo-700' : 'text-gray-700'}`}>
+                    {mentor.name}
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+          
+          {/* 当前导师信息 */}
+          <div className="bg-white/50 rounded-xl p-4 border border-white/60">
+            <div className="flex items-center gap-3 mb-2">
+              <span className="text-2xl">{MENTORS[selectedMentor].avatar}</span>
+              <div>
+                <p className="text-sm font-bold text-gray-800">{MENTORS[selectedMentor].name}</p>
+                <p className="text-xs text-gray-500">{MENTORS[selectedMentor].title}</p>
+              </div>
+            </div>
+            <p className="text-sm text-gray-600 italic pl-1">
+              「{MENTORS[selectedMentor].quote}」
+            </p>
+          </div>
+        </div>
       </section>
 
       {/* --- Memory Recall / Filter Section --- */}

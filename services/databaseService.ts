@@ -1,7 +1,7 @@
 import { CapacitorSQLite, SQLiteConnection, SQLiteDBConnection } from '@capacitor-community/sqlite';
 import { Capacitor } from '@capacitor/core';
-import { DiaryEntry, BackupData, ImportResult, WeeklySummary, WeeklyReport } from '../types';
-import { MoodOption } from '../constants';
+import { DiaryEntry, BackupData, ImportResult, WeeklySummary, WeeklyReport, UserSettings, MentorType } from '../types';
+import { MoodOption, DEFAULT_MENTOR } from '../constants';
 
 // 数据库名称和版本
 const DB_NAME = 'soulmirror_db';
@@ -925,6 +925,38 @@ class DatabaseService {
     } else {
       localStorage.setItem(`soulmirror_setting_${key}`, value);
     }
+  }
+
+  // ==================== 用户设置（导师系统） ====================
+
+  /**
+   * 读取用户设置
+   */
+  async getUserSettings(): Promise<UserSettings> {
+    const settingsJson = await this.getSetting('user_settings');
+    if (settingsJson) {
+      try {
+        return JSON.parse(settingsJson) as UserSettings;
+      } catch {
+        // 解析失败，返回默认值
+      }
+    }
+    return { selectedMentor: DEFAULT_MENTOR };
+  }
+
+  /**
+   * 保存用户设置
+   */
+  async saveUserSettings(settings: UserSettings): Promise<void> {
+    await this.saveSetting('user_settings', JSON.stringify(settings));
+  }
+
+  /**
+   * 获取当前导师
+   */
+  async getSelectedMentor(): Promise<MentorType> {
+    const settings = await this.getUserSettings();
+    return settings.selectedMentor || DEFAULT_MENTOR;
   }
 }
 

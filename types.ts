@@ -141,3 +141,28 @@ export interface WeeklyReport {
     dismissed?: boolean;
   };
 }
+
+
+// ==========================================
+// 导师系统
+// ==========================================
+
+export type MentorType = 'naval' | 'munger' | 'wangyangming' | 'sushi' | 'zengguofan' | 'buddha' | 'murakami' | 'musk';
+
+export interface MentorConfig {
+  id: MentorType;
+  name: string;
+  title: string;
+  avatar: string;
+  quote: string;
+  systemPrompt: {
+    reply: string;
+    regulation: string;
+    weekly: string;
+  };
+}
+
+export interface UserSettings {
+  selectedMentor: MentorType;
+  // 后续扩展：通知设置、主题等
+}

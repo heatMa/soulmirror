@@ -1,5 +1,5 @@
-import { DiaryEntry, AIAnalysis } from "../types";
-import { MoodOption } from "../constants";
+import { DiaryEntry, AIAnalysis, MentorType } from "../types";
+import { MoodOption, MENTORS, DEFAULT_MENTOR } from "../constants";
 import { getEntryDurationMinutes, formatDuration } from "../utils/timeUtils";
 
 // ==========================================
@@ -329,8 +329,11 @@ export const analyzeMoods = async (entries: DiaryEntry[]): Promise<AIAnalysis> =
 export const generateRegulationSuggestions = async (
   mood: string,
   content: string,
-  moodScore: number
+  moodScore: number,
+  mentor: MentorType = DEFAULT_MENTOR
 ): Promise<string[]> => {
+  const mentorConfig = MENTORS[mentor];
+
   const promptText = `
     用户刚刚写了一篇负面情绪的心情日记：
 
@@ -338,19 +341,12 @@ export const generateRegulationSuggestions = async (
     情绪评分: ${moodScore}分（满分10分）
     日记内容: ${content}
 
-    请根据用户的具体情绪和日记内容，给出2-3条针对性的行动建议。
+    请根据用户的具体情绪和日记内容，以${mentorConfig.name}的风格，给出2-3条针对性的行动建议。
 
     要求：
     1. 每条建议15-30个字，具体可执行
-    2. 首先识别情绪来源类型，然后给出对应建议：
-       - 工作压力/任务受挫 → 拆解任务、降低标准、先完成最核心的部分
-       - 人际冲突/沟通问题 → 冷静后主动沟通、换位思考、写下想说的话
-       - 拖延/自责 → 从最小的一步开始、设置5分钟计时器、允许不完美
-       - 孤独/低落 → 联系一个朋友、做一件小事取悦自己、出门走走
-       - 焦虑/担忧未来 → 写下具体担忧、聚焦今天能做的一件事、设定边界
-    3. 避免泛泛的建议如"深呼吸"、"散散步"、"休息一下"、"放松心情"
-    4. 建议要与日记内容相关，而不是通用建议
-    5. 语气直接但温和，像朋友给的实用建议
+    2. 必须符合你的导师风格（不要空洞的"深呼吸"、"放松心情"）
+    3. 建议要与日记内容相关，而不是通用建议
 
     返回 JSON 格式: { "suggestions": ["建议1", "建议2", "建议3"] }
   `;
@@ -359,9 +355,9 @@ export const generateRegulationSuggestions = async (
     let jsonString = "{}";
 
     if (CURRENT_PROVIDER === 'DEEPSEEK') {
-      console.log("Using DeepSeek for Regulation Suggestions...");
+      console.log(`Using DeepSeek for Regulation Suggestions (${mentorConfig.name})...`);
       jsonString = await callDeepSeek(
-        "你是一位实用主义的心理咨询师，擅长给出具体可行的下一步行动，而不是空洞的安慰。请只返回 JSON。",
+        mentorConfig.systemPrompt.regulation,
         promptText
       );
     } else {
@@ -377,7 +373,14 @@ export const generateRegulationSuggestions = async (
 };
 
 // 生成 AI 暖心回复
-export const generateAiReply = async (mood: string, content: string, moodScore?: number): Promise<string> => {
+export const generateAiReply = async (
+  mood: string, 
+  content: string, 
+  moodScore?: number,
+  mentor: MentorType = DEFAULT_MENTOR
+): Promise<string> => {
+  const mentorConfig = MENTORS[mentor];
+  
   // 判断是否需要鸡汤（评分 ≤ 5）
   const needsEncouragement = moodScore !== undefined && moodScore <= 5;
 
@@ -388,33 +391,26 @@ export const generateAiReply = async (mood: string, content: string, moodScore?:
     日记内容: ${content}
     ${moodScore !== undefined ? `情绪评分: ${moodScore}分（满分10分）` : ''}
 
-    请用一句温暖、真诚的话回应用户。要求：
-    1. 简短有力，不超过30个字
-    2. 表达共情和理解，不要说教
-    3. 根据情绪调整语气：
-       - 开心时：一起分享喜悦
-       - 难过时：温柔陪伴，给予力量
-       - 平静时：肯定当下的状态
-    4. 可以适当使用 emoji，但不要超过1个
-    5. 不要用"亲"、"宝"等过于亲昵的称呼
+    请用一句温暖、真诚的话回应用户。
+    
     ${needsEncouragement ? `
-    6. 【重要】用户情绪低落（评分≤5），请在回复最后另起一行，加上一句简短有力的鸡汤金句：
+    【重要】用户情绪低落（评分≤5），请在回复最后另起一行，加上一句简短有力的金句：
        - 要与日记内容相关，针对用户的具体困境
        - 15-25个字，有力量感，能给人希望
        - 用「」符号包裹，如：「黑夜之后，总有黎明」
-       - 避免老套的鸡汤，要有新意和洞察
+       - 符合你的导师风格，避免老套
     ` : ''}
 
-    返回 JSON 格式: { "reply": "你的回复${needsEncouragement ? '\\n\\n「鸡汤金句」' : ''}" }
+    返回 JSON 格式: { "reply": "你的回复${needsEncouragement ? '\\n\\n「金句」' : ''}" }
   `;
 
   try {
     let jsonString = "{}";
 
     if (CURRENT_PROVIDER === 'DEEPSEEK') {
-      console.log("Using DeepSeek for AI Reply...");
+      console.log(`Using DeepSeek for AI Reply (${mentorConfig.name})...`);
       jsonString = await callDeepSeek(
-        "你是一位温暖细腻的倾听者，善于用简短的话给人力量。请只返回 JSON。",
+        mentorConfig.systemPrompt.reply,
         promptText
       );
     } else {
@@ -466,7 +462,10 @@ export interface TriggerAnalysis {
 }
 
 // 生成 AI 情绪周报
-export const generateWeeklyReport = async (entries: DiaryEntry[]): Promise<WeeklyReport> => {
+export const generateWeeklyReport = async (
+  entries: DiaryEntry[],
+  mentor: MentorType = DEFAULT_MENTOR
+): Promise<WeeklyReport> => {
   if (entries.length === 0) {
     return {
       period: '过去一周',
@@ -578,13 +577,15 @@ export const generateWeeklyReport = async (entries: DiaryEntry[]): Promise<Weekl
     - 语气温和鼓励，不要说教
   `;
 
+  const mentorConfig = MENTORS[mentor];
+
   try {
     let jsonString = "{}";
 
     if (CURRENT_PROVIDER === 'DEEPSEEK') {
-      console.log("Using DeepSeek for Weekly Report...");
+      console.log(`Using DeepSeek for Weekly Report (${mentorConfig.name})...`);
       jsonString = await callDeepSeek(
-        "你是一位专业的心理数据分析师，擅长从情绪数据中发现规律并给出建设性建议。请只返回 JSON。",
+        mentorConfig.systemPrompt.weekly,
         promptText
       );
     } else {

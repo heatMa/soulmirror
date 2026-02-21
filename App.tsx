@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { App as CapacitorApp } from '@capacitor/app';
-import { DiaryEntry, ViewMode, WeeklyReport } from './types';
+import { DiaryEntry, ViewMode, WeeklyReport, MentorType, UserSettings } from './types';
 import DiaryEntryForm from './components/DiaryEntryForm';
 import Dashboard from './components/Dashboard';
 import CalendarStrip from './components/CalendarStrip';
@@ -14,7 +14,7 @@ import Statistics from './components/Statistics';
 import WeeklyReportCard from './components/WeeklyReportCard';
 import WeeklyReportView from './components/WeeklyReportView';
 import WeeklyReportPreview from './components/WeeklyReportPreview';
-import { ICONS, MOOD_OPTIONS, MoodOption, getEffectiveCustomMoods } from './constants';
+import { ICONS, MOOD_OPTIONS, MoodOption, getEffectiveCustomMoods, DEFAULT_MENTOR } from './constants';
 import { evaluateMoodScore, generateAiReply, generateRegulationSuggestions } from './services/geminiService';
 import { databaseService } from './services/databaseService';
 import { getEnergyAfterEntry } from './utils/energyUtils';
@@ -49,6 +49,9 @@ const App: React.FC = () => {
     weekKey: string;
   } | null>(null);
 
+  // 导师系统状态
+  const [selectedMentor, setSelectedMentor] = useState<MentorType>(DEFAULT_MENTOR);
+
   // 初始化数据库并加载数据
   useEffect(() => {
     const initializeApp = async () => {
@@ -60,11 +63,15 @@ const App: React.FC = () => {
         await databaseService.initialize();
         
         // 并行加载所有数据
-        const [loadedEntries, loadedNotes, loadedCustomMoods] = await Promise.all([
+        const [loadedEntries, loadedNotes, loadedCustomMoods, userSettings] = await Promise.all([
           databaseService.getAllEntries(),
           databaseService.getAllDailyNotes(),
-          databaseService.getCustomMoods()
+          databaseService.getCustomMoods(),
+          databaseService.getUserSettings()
         ]);
+        
+        // 设置导师
+        setSelectedMentor(userSettings.selectedMentor);
 
         // 清理与默认心情重复的自定义心情（持久化清理，下次加载时不再有重复）
         const defaultLabels = MOOD_OPTIONS.map(m => m.label);
@@ -230,7 +237,7 @@ const App: React.FC = () => {
 
               // 负面情绪时生成调节建议（评分 ≤ -3）
               if (aiScore <= -3) {
-                generateRegulationSuggestions(updatedEntry.mood, updatedEntry.content, aiScore)
+                generateRegulationSuggestions(updatedEntry.mood, updatedEntry.content, aiScore, selectedMentor)
                   .then(async (suggestions) => {
                     if (suggestions && suggestions.length > 0) {
                       await databaseService.updateEntryAiSuggestions(updatedEntry.id, suggestions);
@@ -315,7 +322,7 @@ const App: React.FC = () => {
 
               // 负面情绪时生成调节建议（评分 ≤ -3）
               if (aiScore <= -3) {
-                generateRegulationSuggestions(newEntry.mood, newEntry.content, aiScore)
+                generateRegulationSuggestions(newEntry.mood, newEntry.content, aiScore, selectedMentor)
                   .then(async (suggestions) => {
                     if (suggestions && suggestions.length > 0) {
                       await databaseService.updateEntryAiSuggestions(newEntry.id, suggestions);
@@ -328,7 +335,7 @@ const App: React.FC = () => {
               }
 
               // AI 暖心回复
-              generateAiReply(newEntry.mood, newEntry.content, aiScore)
+              generateAiReply(newEntry.mood, newEntry.content, aiScore, selectedMentor)
                 .then(async (reply) => {
                   if (reply) {
                     await databaseService.updateEntryAiReply(newEntry.id, reply);

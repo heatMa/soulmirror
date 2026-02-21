@@ -109,8 +109,8 @@ interface WeekSummary {
 /**
  * 聚合一周的数据
  */
-function aggregateWeekData(entries: DiaryEntry[]): WeekSummary {
-  const weekKey = getCurrentWeekKey();
+function aggregateWeekData(entries: DiaryEntry[], targetWeekKey?: string): WeekSummary {
+  const weekKey = targetWeekKey || getCurrentWeekKey();
   const weekRange = getWeekRange(weekKey);
   
   if (entries.length === 0) {
@@ -420,7 +420,7 @@ export async function generateWeeklyReport(weekKey?: string): Promise<WeeklyRepo
   });
   
   // 2. 聚合数据
-  const summary = aggregateWeekData(weekEntries);
+  const summary = aggregateWeekData(weekEntries, targetWeek);
   
   // 3. 生成 AI 内容
   const aiContent = await generateAIContent(summary);
