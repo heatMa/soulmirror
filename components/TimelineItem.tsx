@@ -45,6 +45,9 @@ const TimelineItem: React.FC<Props> = ({
   const moodHexColor = moodConfig.hexColor || getHexFromTailwind(moodConfig.color);
   const timeString = date.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
   const durationDisplay = getEntryDurationDisplay(entry);
+  // 计算字数（去除HTML标签）
+  const contentText = entry.content.replace(/<[^>]*>/g, '');
+  const charCount = contentText.length;
 
   const toggleCollapse = () => {
     if (!showDeleteBtn) {
@@ -218,6 +221,14 @@ const TimelineItem: React.FC<Props> = ({
                 <span className="text-sm font-medium text-gray-400 font-mono tracking-tight">
                   {timeString}
                 </span>
+                {durationDisplay && (
+                  <span className="text-xs font-medium text-gray-500">
+                    ⏱️{durationDisplay}
+                  </span>
+                )}
+                <span className="text-xs text-gray-400">
+                  {charCount}字
+                </span>
                 {entry.energyDelta != null && energyRemaining !== undefined && (
                   <span className="text-sm font-bold" style={{ color: entry.energyDelta >= 0 ? '#10b981' : '#f43f5e' }}>
                     {formatEnergyDisplay(entry.energyDelta, energyRemaining)}
@@ -259,13 +270,6 @@ const TimelineItem: React.FC<Props> = ({
               </button>
             </div>
           </div>
-
-          {/* Duration Display */}
-          {durationDisplay && (
-            <div className="text-xs font-medium text-gray-500 mt-1">
-              ⏱️ {durationDisplay}
-            </div>
-          )}
 
           {/* Content Body */}
           {!isCollapsed && (

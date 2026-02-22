@@ -174,11 +174,14 @@ const App: React.FC = () => {
 
   // 根据选中的日期加载对应周的周报
   useEffect(() => {
+    // 等待数据库初始化完成后再加载周报
+    if (isLoading) return;
+
     const loadWeeklyReportForDate = async () => {
       try {
         const weekKey = getWeekKeyForDate(selectedDate);
         const report = await databaseService.getWeeklyReport(weekKey);
-        
+
         if (report) {
           setCurrentWeekReport(report);
           setWeeklyReportStatus(null);
@@ -194,7 +197,7 @@ const App: React.FC = () => {
     };
 
     loadWeeklyReportForDate();
-  }, [selectedDate]);
+  }, [selectedDate, isLoading]);
 
   // 保存日记条目
   const handleSaveEntry = useCallback(async (formData: Omit<DiaryEntry, 'id' | 'timestamp'> & { id?: string, timestamp?: number }) => {
@@ -254,6 +257,18 @@ const App: React.FC = () => {
                   currentEntries.map(e => e.id === updatedEntry.id ? { ...e, aiSuggestions: undefined } : e)
                 );
               }
+
+              // AI 暖心回复（编辑后重新生成）
+              generateAiReply(updatedEntry.mood, updatedEntry.content, aiScore, selectedMentor)
+                .then(async (reply) => {
+                  if (reply) {
+                    await databaseService.updateEntryAiReply(updatedEntry.id, reply);
+                    setEntries(currentEntries =>
+                      currentEntries.map(e => e.id === updatedEntry.id ? { ...e, aiReply: reply } : e)
+                    );
+                  }
+                })
+                .catch(console.error);
             }
           })
           .catch(console.error);
