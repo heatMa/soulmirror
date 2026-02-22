@@ -373,4 +373,32 @@ Service.prototype.newMethod = async function() {...}
 
 ---
 
-*最后更新: 2025-02-19*
+## 2025-02-22 腾讯云部署迁移
+
+### 部署平台变更
+
+**从 Cloudflare Pages 迁移到腾讯云云开发 (CloudBase)**
+
+#### 变更原因
+- 国内访问速度更快
+- 与微信生态更好的集成能力
+- 免费额度充足
+
+#### 部署配置
+```bash
+# 腾讯云 CLI 命令
+cloudbase hosting:deploy dist -e soulmirror-3gen9oau21b35f0d
+
+# 环境信息
+- 环境名称: soulmirror
+- 环境 ID: soulmirror-3gen9oau21b35f0d
+- 访问域名: https://soulmirror-3gen9oau21b35f0d-1403375226.tcloudbaseapp.com
+```
+
+#### 文档更新
+- ✅ CLAUDE.md 部署章节更新，腾讯云为主要部署方式
+- ✅ progress.md 添加部署迁移记录
+
+---
+
+*最后更新: 2025-02-22*

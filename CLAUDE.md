@@ -151,9 +151,32 @@ Note: There is NO `@capacitor/background-task` plugin. Use notification scheduli
 
 ## Deployment
 
-### Web (Cloudflare Pages)
+### Web (腾讯云云开发 CloudBase) - 主要部署方式
 
-项目通过 Wrangler CLI 手动部署到 Cloudflare Pages：
+项目默认部署到腾讯云云开发（CloudBase）静态托管：
+
+```bash
+# 构建
+npm run build
+
+# 部署到腾讯云（环境 ID: soulmirror-3gen9oau21b35f0d）
+cloudbase hosting:deploy dist -e soulmirror-3gen9oau21b35f0d
+# 或使用短命令
+npx tcb hosting:deploy dist -e soulmirror-3gen9oau21b35f0d
+```
+
+- **线上地址**: https://soulmirror-3gen9oau21b35f0d-1403375226.tcloudbaseapp.com
+- **部署方式**: 手动部署（CLI）
+- **环境名称**: soulmirror
+- **环境 ID**: soulmirror-3gen9oau21b35f0d
+
+**部署前准备**:
+1. 安装腾讯云 CLI: `npm install -g @cloudbase/cli`
+2. 登录: `cloudbase login`
+
+### Web (Cloudflare Pages) - 备选部署
+
+如需部署到 Cloudflare Pages（原方案）：
 
 ```bash
 # 构建并部署到生产环境（主域名 soulmirror.pages.dev）
