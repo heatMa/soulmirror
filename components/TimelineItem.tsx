@@ -217,18 +217,18 @@ const TimelineItem: React.FC<Props> = ({
               <span className="text-[11px] font-medium text-gray-400 tracking-tight">
                 今{countToday}・周{countWeek}・月{countMonth}
               </span>
+              <span className="text-[11px] text-gray-400">
+                {charCount}字
+              </span>
               <div className="flex items-baseline gap-2">
-                <span className="text-sm font-medium text-gray-400 font-mono tracking-tight">
+                <span className="text-sm font-bold text-black font-mono tracking-tight">
                   {timeString}
                 </span>
                 {durationDisplay && (
-                  <span className="text-xs font-medium text-gray-500">
+                  <span className="text-xs font-bold text-black">
                     ⏱️{durationDisplay}
                   </span>
                 )}
-                <span className="text-xs text-gray-400">
-                  {charCount}字
-                </span>
                 {entry.energyDelta != null && energyRemaining !== undefined && (
                   <span className="text-sm font-bold" style={{ color: entry.energyDelta >= 0 ? '#10b981' : '#f43f5e' }}>
                     {formatEnergyDisplay(entry.energyDelta, energyRemaining)}
