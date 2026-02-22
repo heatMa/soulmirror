@@ -270,7 +270,7 @@ const Dashboard: React.FC<Props> = ({ entries, onDataRestored }) => {
       return;
     }
 
-    const header = `SoulMirror 心情日记导出 - ${label}\n生成时间: ${now.toLocaleString()}\n====================================\n\n`;
+    const header = `美好时光 心情日记导出 - ${label}\n生成时间: ${now.toLocaleString()}\n====================================\n\n`;
     const body = dataToExport.map(e => {
       const time = new Date(e.timestamp).toLocaleString();
       return `[${time}] ${e.mood} (评分: ${e.moodScore.toFixed(1)})\n内容: ${e.content}\n------------------------------------`;
@@ -314,7 +314,7 @@ const Dashboard: React.FC<Props> = ({ entries, onDataRestored }) => {
             title: '保存备份文件',
             text: '请选择保存位置',
             url: result.uri,
-            dialogTitle: '保存 SoulMirror 备份'
+            dialogTitle: '保存 美好时光 备份'
           });
 
           alert(`备份完成！\n\n文件名: ${filename}\n\n请在分享菜单中选择"保存到文件"或其他存储位置。\n妥善保管此文件，恢复数据时需要使用。`);

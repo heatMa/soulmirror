@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-SoulMirror is an AI-powered emotional diary (情绪日记) mobile app built with React and Capacitor. It helps users track their moods, write daily reflections, and receive AI-generated emotional analysis and suggestions.
+美好时光 (SoulMirror) is an AI-powered emotional diary (情绪日记) mobile app built with React and Capacitor. It helps users track their moods, write daily reflections, and receive AI-generated emotional analysis and suggestions.
 
 ## Development Commands
 

@@ -522,7 +522,7 @@ const App: React.FC = () => {
           .join('\n\n------------------\n\n');
         summaryText += `💫 心情记录：\n${entriesText}`;
     }
-    const finalContent = `📅 ${dateStr} 心情日记\n\n${summaryText}\n\n✨ 来自 SoulMirror`;
+    const finalContent = `📅 ${dateStr} 心情日记\n\n${summaryText}\n\n✨ 来自 美好时光`;
     navigator.clipboard.writeText(finalContent).then(() => {
       setIsCopied(true);
       setTimeout(() => setIsCopied(false), 2000);
