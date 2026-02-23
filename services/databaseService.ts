@@ -634,12 +634,20 @@ class DatabaseService {
     // 确保 suggestions 是数组格式
     const suggestionsArray = Array.isArray(mood.suggestions) ? mood.suggestions : [];
 
+    console.log('saveCustomMood:', { label: mood.label, emoji: mood.emoji, score: mood.score });
+
     if (this.isNative && this.db) {
-      await this.db.run(
-        `INSERT OR REPLACE INTO custom_moods (label, value, score, emoji, color, hex_color, shadow, suggestions)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-        [mood.label, mood.value, mood.score, mood.emoji, mood.color, mood.hexColor || null, mood.shadow, JSON.stringify(suggestionsArray)]
-      );
+      try {
+        await this.db.run(
+          `INSERT OR REPLACE INTO custom_moods (label, value, score, emoji, color, hex_color, shadow, suggestions)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+          [mood.label, mood.value, mood.score, mood.emoji, mood.color, mood.hexColor || null, mood.shadow, JSON.stringify(suggestionsArray)]
+        );
+        console.log('SQLite 保存成功:', mood.label);
+      } catch (err) {
+        console.error('SQLite 保存失败:', mood.label, err);
+        throw err;
+      }
     } else {
       const moods = await this.getCustomMoods();
       const index = moods.findIndex(m => m.label === mood.label);
@@ -650,6 +658,7 @@ class DatabaseService {
         moods.push(moodToSave);
       }
       localStorage.setItem(STORAGE_KEYS.CUSTOM_MOODS, JSON.stringify(moods));
+      console.log('localStorage 保存成功:', mood.label);
     }
   }
 
@@ -948,7 +957,22 @@ class DatabaseService {
       if (backupData.data.customMoods && Array.isArray(backupData.data.customMoods)) {
         for (const mood of backupData.data.customMoods) {
           try {
+            // 调试日志：显示正在处理的心情
+            console.log('导入自定义心情:', mood.label, mood);
+            
             // 规范化心情数据，确保所有必需字段存在
+            let suggestions: string[] = [];
+            try {
+              suggestions = Array.isArray(mood.suggestions) 
+                ? mood.suggestions 
+                : (typeof mood.suggestions === 'string' && mood.suggestions
+                    ? JSON.parse(mood.suggestions) 
+                    : []);
+            } catch (e) {
+              console.error(`解析 suggestions 失败 for ${mood.label}:`, mood.suggestions, e);
+              suggestions = [];
+            }
+            
             const normalizedMood: MoodOption = {
               label: mood.label || '',
               value: mood.value || mood.label || '',
@@ -957,12 +981,7 @@ class DatabaseService {
               color: mood.color || 'bg-gray-400',
               hexColor: mood.hexColor,
               shadow: mood.shadow || 'shadow-gray-200',
-              // 处理 suggestions 可能是字符串或数组的情况
-              suggestions: Array.isArray(mood.suggestions) 
-                ? mood.suggestions 
-                : (typeof mood.suggestions === 'string' 
-                    ? JSON.parse(mood.suggestions || '[]') 
-                    : [])
+              suggestions
             };
             
             if (!normalizedMood.label) {
@@ -971,9 +990,11 @@ class DatabaseService {
             }
             
             await this.saveCustomMood(normalizedMood);
+            console.log('成功导入自定义心情:', normalizedMood.label);
             result.moodsImported++;
           } catch (err) {
-            result.errors.push(`导入自定义心情失败: ${mood.label || '未知标签'}`);
+            console.error(`导入自定义心情失败: ${mood.label || '未知标签'}`, err);
+            result.errors.push(`导入自定义心情失败: ${mood.label || '未知标签'} - ${err}`);
           }
         }
       }
