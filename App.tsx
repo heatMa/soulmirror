@@ -466,7 +466,7 @@ const App: React.FC = () => {
     return {
       label: moodLabel,
       value: moodLabel,
-      score: fallbackScore, // V2 系统默认 0（中性），V1 遗留是 5
+      score: fallbackScore, // V2 能量系统默认 0（中性）
       emoji: entry?.moodEmoji || '🏷️',
       color: 'bg-gray-400',
       hexColor: entry?.moodHexColor || '#9ca3af',

@@ -168,13 +168,13 @@ const DiaryEntryForm: React.FC<Props> = ({ initialData, onSave, onClose, customM
     setIsGeneratingTag(true);
     try {
       const metadata = await generateMoodMetadata(trimmed);
-      // 确保 score 是有效的数字，且使用 V2 系统（-10 到 +10）
+      // 确保 score 是有效的数字，且使用 V2 能量系统（-10 到 +10）
       let score = metadata.score ?? 0;
-      // 如果 AI 返回了 V1 范围的正值（1-10）用于负面情绪，强制转换为负值
+      // 校正：如果 AI 错误地返回了正值用于负面情绪，强制转换为负值
       if (score > 0 && score <= 10) {
         // 检查是否应该是负面情绪（简单启发式：如果元数据显示负面颜色）
-        const isNegativeColor = metadata.color?.includes('rose') || 
-                               metadata.color?.includes('red') || 
+        const isNegativeColor = metadata.color?.includes('rose') ||
+                               metadata.color?.includes('red') ||
                                metadata.color?.includes('purple') ||
                                metadata.color?.includes('amber') ||
                                metadata.color?.includes('orange');

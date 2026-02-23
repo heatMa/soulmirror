@@ -240,7 +240,7 @@ export const generateMoodMetadata = async (moodLabel: string): Promise<Partial<M
       emoji: '🏷️',
       color: 'bg-slate-400',
       hexColor: '#94a3b8',
-      score: 0  // V2 系统默认 0，V1 遗留是 5
+      score: 0  // V2 能量系统默认 0（中性）
     };
   }
 };

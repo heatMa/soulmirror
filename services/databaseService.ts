@@ -45,7 +45,7 @@ CREATE TABLE IF NOT EXISTS custom_moods (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   label TEXT NOT NULL UNIQUE,
   value TEXT NOT NULL,
-  score INTEGER DEFAULT 0,  -- V2 系统默认 0（中性），V1 遗留是 5
+  score INTEGER DEFAULT 0,  -- V2 能量系统：-10到+10，默认 0（中性）
   emoji TEXT NOT NULL,
   color TEXT NOT NULL,
   hex_color TEXT,
@@ -255,7 +255,7 @@ class DatabaseService {
 
       if (!hasScoreVersion) {
         await this.db.execute("ALTER TABLE diary_entries ADD COLUMN score_version TEXT DEFAULT 'v1'");
-        console.log('数据库迁移：添加 score_version 列');
+        console.log('数据库迁移：添加 score_version 列（旧数据默认 v1）');
       }
     } catch (error) {
       console.error('数据库迁移失败:', error);
@@ -722,23 +722,24 @@ class DatabaseService {
   }
 
   /**
-   * 修复指定心情的所有日记条目分数
+   * 修复指定心情的所有日记条目分数（将 V1 数据转换为 V2）
    */
   private async fixEntriesForMood(moodLabel: string, newScore: number): Promise<void> {
     await this.ensureInitialized();
 
     if (this.isNative && this.db) {
-      // SQLite: 更新所有该心情的条目
+      // SQLite: 只更新还未转换的 V1 数据（scoreVersion 不是 'v2'）
       await this.db.run(
-        'UPDATE diary_entries SET mood_score = ?, energy_delta = ?, score_version = ? WHERE mood = ? AND (mood_score > 0 OR energy_delta > 0)',
-        [newScore, newScore, 'v2', moodLabel]
+        'UPDATE diary_entries SET mood_score = ?, energy_delta = ?, score_version = ? WHERE mood = ? AND (score_version IS NULL OR score_version != ?)',
+        [newScore, newScore, 'v2', moodLabel, 'v2']
       );
     } else {
-      // localStorage: 更新所有该心情的条目
+      // localStorage: 只更新还未转换的 V1 数据
       const entries = await this.getAllEntries();
       let updated = false;
       const fixedEntries = entries.map(entry => {
-        if (entry.mood === moodLabel && (entry.moodScore > 0 || (entry.energyDelta ?? 0) > 0)) {
+        // 只更新该心情且还未转换为 V2 的条目
+        if (entry.mood === moodLabel && entry.scoreVersion !== 'v2') {
           updated = true;
           return {
             ...entry,

@@ -13,8 +13,8 @@ export interface DiaryEntry {
   endTimestamp?: number; // 情绪结束时间（可选，用于自动计算持续时长）
   duration?: number; // 手动填写的持续时长（分钟，可选）
   isActive?: boolean; // 是否进行中（未结束）
-  energyDelta?: number; // 本条记录的能量变化值（-10到+10，新能量系统）
-  // scoreVersion 已废弃，保留字段仅用于兼容旧数据，新代码不再使用
+  energyDelta?: number; // 本条记录的能量变化值（-10到+10，能量系统）
+  scoreVersion?: 'v1' | 'v2'; // 分数版本标记，用于数据迁移（v2 为当前版本）
 }
 
 export interface AIAnalysis {
