@@ -4,7 +4,7 @@ import { DiaryEntry, BackupData, ImportResult, MentorType, UserSettings } from '
 import { databaseService } from '../services/databaseService';
 import { ICONS, MOOD_OPTIONS, MoodOption, MENTORS, DEFAULT_MENTOR } from '../constants';
 import { Capacitor } from '@capacitor/core';
-import { Filesystem, Directory } from '@capacitor/filesystem';
+import { Filesystem, Directory, Encoding } from '@capacitor/filesystem';
 import { Share } from '@capacitor/share';
 
 interface Props {
@@ -152,13 +152,14 @@ const Dashboard: React.FC<Props> = ({ entries, onDataRestored }) => {
       const isNative = Capacitor.isNativePlatform();
 
       if (isNative) {
-        // Android/iOS 平台 - 使用 Filesystem API
+        // Android/iOS 平台 - 使用应用私有目录 + Share API
         try {
+          // 使用应用私有缓存目录(不需要特殊权限)
           const result = await Filesystem.writeFile({
             path: filename,
             data: jsonStr,
-            directory: Directory.Documents,
-            encoding: undefined
+            directory: Directory.Cache, // 改用 Cache 目录（无需权限）
+            encoding: Encoding.UTF8 // 使用枚举类型
           });
 
           console.log('文件保存成功:', result.uri);
@@ -174,7 +175,8 @@ const Dashboard: React.FC<Props> = ({ entries, onDataRestored }) => {
           alert(`备份完成！\n\n文件名: ${filename}\n\n请在分享菜单中选择"保存到文件"或其他存储位置。\n妥善保管此文件，恢复数据时需要使用。`);
         } catch (nativeError) {
           console.error('原生平台备份失败:', nativeError);
-          alert('备份失败，请检查应用权限设置');
+          const errorMsg = nativeError instanceof Error ? nativeError.message : String(nativeError);
+          alert(`备份失败：${errorMsg}\n\n请尝试：\n1. 重启应用后再试\n2. 检查存储空间是否充足`);
         }
       } else {
         // Web 平台 - 使用传统下载方式

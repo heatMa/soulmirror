@@ -663,7 +663,7 @@ class DatabaseService {
   }
 
   /**
-   * 删除自定义心情
+   * 删除自定义心情（同时加入黑名单，防止自动迁移恢复）
    */
   async deleteCustomMood(label: string): Promise<void> {
     await this.ensureInitialized();
@@ -674,6 +674,28 @@ class DatabaseService {
       const moods = await this.getCustomMoods();
       const filtered = moods.filter(m => m.label !== label);
       localStorage.setItem(STORAGE_KEYS.CUSTOM_MOODS, JSON.stringify(filtered));
+    }
+
+    // 加入黑名单
+    await this.addToDeletedMoodBlacklist(label);
+  }
+
+  /**
+   * 获取已删除心情黑名单（防止自动迁移恢复）
+   */
+  async getDeletedMoodBlacklist(): Promise<string[]> {
+    const data = await this.getSetting('deleted_mood_blacklist');
+    return data ? JSON.parse(data) : [];
+  }
+
+  /**
+   * 将心情标签加入黑名单
+   */
+  async addToDeletedMoodBlacklist(label: string): Promise<void> {
+    const blacklist = await this.getDeletedMoodBlacklist();
+    if (!blacklist.includes(label)) {
+      blacklist.push(label);
+      await this.saveSetting('deleted_mood_blacklist', JSON.stringify(blacklist));
     }
   }
 
