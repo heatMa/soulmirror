@@ -48,6 +48,7 @@ const App: React.FC = () => {
     isGenerationTime: boolean;
     weekKey: string;
   } | null>(null);
+  const [weeklyReportsExpanded, setWeeklyReportsExpanded] = useState(false);
 
   // 导师系统状态
   const [selectedMentor, setSelectedMentor] = useState<MentorType>(DEFAULT_MENTOR);
@@ -617,58 +618,78 @@ const App: React.FC = () => {
                </button>
             </div>
 
-            {/* Daily Mood Chart */}
+            {/* 查看周报按钮 */}
+            <div className="mb-4 animate-in fade-in slide-in-from-bottom-4 duration-700">
+              <button
+                onClick={() => setWeeklyReportsExpanded(!weeklyReportsExpanded)}
+                className="w-full glass-card rounded-2xl px-4 py-3 flex items-center justify-between transition-all hover:shadow-md"
+              >
+                <div className="flex items-center gap-2">
+                  <ICONS.Report />
+                  <span className="font-medium text-gray-700">查看周报</span>
+                </div>
+                <div className={`transition-transform duration-300 ${weeklyReportsExpanded ? 'rotate-90' : ''}`}>
+                  <ICONS.ChevronRight />
+                </div>
+              </button>
+            </div>
+
+            {/* 周报列表（展开时显示） */}
+            {weeklyReportsExpanded && (
+              <>
+                {currentWeekReport ? (
+                  <div className="mb-4 animate-in fade-in slide-in-from-top-2 duration-300">
+                    <WeeklyReportCard
+                      report={currentWeekReport}
+                      onClick={() => {
+                        databaseService.markReportAsViewed(currentWeekReport.weekKey);
+                        setShowReportView(true);
+                      }}
+                      onRegenerate={async (weekKey: string) => {
+                        try {
+                          const newReport = await regenerateWeeklyReport(weekKey);
+                          if (newReport) {
+                            setCurrentWeekReport(newReport);
+                          }
+                        } catch (error) {
+                          console.error('重新生成周报失败:', error);
+                          alert('重新生成失败，请重试');
+                        }
+                      }}
+                    />
+                  </div>
+                ) : weeklyReportStatus && (
+                  <div className="mb-4 animate-in fade-in slide-in-from-top-2 duration-300">
+                    <WeeklyReportPreview
+                      entryCount={weeklyReportStatus.entryCount}
+                      minEntries={3}
+                      weekKey={weeklyReportStatus.weekKey}
+                      onGenerate={async (weekKey: string) => {
+                        try {
+                          const report = await generateWeeklyReport(weekKey);
+                          if (report) {
+                            setCurrentWeekReport(report);
+                            setWeeklyReportStatus(null);
+                          }
+                        } catch (error) {
+                          console.error('生成周报失败:', error);
+                          throw error;
+                        }
+                      }}
+                    />
+                  </div>
+                )}
+              </>
+            )}
+
+            {/* Daily Mood Chart - 今日情绪波动 */}
             {timelineEntries.length > 0 && (
               <div className="mb-4 h-48 animate-in fade-in slide-in-from-bottom-6 duration-700">
                  <DailyMoodChart entries={timelineEntries} customMoods={effectiveCustomMoods} />
               </div>
             )}
 
-            {/* Weekly Report Card - 周报入口 */}
-            {currentWeekReport ? (
-              <div className="animate-in fade-in slide-in-from-bottom-5 duration-700">
-                <WeeklyReportCard 
-                  report={currentWeekReport}
-                  onClick={() => {
-                    databaseService.markReportAsViewed(currentWeekReport.weekKey);
-                    setShowReportView(true);
-                  }}
-                  onRegenerate={async (weekKey: string) => {
-                    try {
-                      const newReport = await regenerateWeeklyReport(weekKey);
-                      if (newReport) {
-                        setCurrentWeekReport(newReport);
-                      }
-                    } catch (error) {
-                      console.error('重新生成周报失败:', error);
-                      alert('重新生成失败，请重试');
-                    }
-                  }}
-                />
-              </div>
-            ) : weeklyReportStatus && (
-              <div className="animate-in fade-in slide-in-from-bottom-5 duration-700">
-                <WeeklyReportPreview 
-                  entryCount={weeklyReportStatus.entryCount}
-                  minEntries={3}
-                  weekKey={weeklyReportStatus.weekKey}
-                  onGenerate={async (weekKey: string) => {
-                    try {
-                      const report = await generateWeeklyReport(weekKey);
-                      if (report) {
-                        setCurrentWeekReport(report);
-                        setWeeklyReportStatus(null);
-                      }
-                    } catch (error) {
-                      console.error('生成周报失败:', error);
-                      throw error;
-                    }
-                  }}
-                />
-              </div>
-            )}
-
-            {/* Deep Reflection Section */}
+            {/* Daily Note Editor - 今日笔记 */}
             <div className="mb-4 animate-in fade-in slide-in-from-bottom-6 duration-700">
                <DeepReflectionSection
                  selectedDate={selectedDate}
@@ -676,14 +697,14 @@ const App: React.FC = () => {
                />
             </div>
 
-            {/* Weekly Goal */}
-            <div className="mb-4 animate-in fade-in slide-in-from-bottom-5 duration-700">
-               <WeeklyGoal entries={entries} />
-            </div>
-
-            {/* Energy Battery */}
+            {/* Energy Battery - 剩余能量 */}
             <div className="mb-6 animate-in fade-in slide-in-from-bottom-6 duration-700">
                <EnergyBattery entries={timelineEntries} allEntries={entries} customMoods={effectiveCustomMoods} />
+            </div>
+
+            {/* 今日记录标题 */}
+            <div className="flex justify-between items-center mb-3 px-2">
+              <h3 className="text-lg font-bold text-gray-800">今日记录</h3>
             </div>
             
             {timelineEntries.length === 0 ? (
@@ -725,9 +746,9 @@ const App: React.FC = () => {
       ) : viewMode === ViewMode.ANALYSIS ? (
         <div className="flex-1 px-4 pt-safe-top pb-24 overflow-y-auto no-scrollbar">
            <div className="flex justify-between items-center mb-6 px-2">
-              <h2 className="text-2xl font-bold text-gray-800 tracking-tight">AI 情绪洞察</h2>
+              <h2 className="text-2xl font-bold text-gray-800 tracking-tight">记忆回溯</h2>
            </div>
-          <Dashboard entries={entries} onDataRestored={handleDataRestored} />
+          <Dashboard entries={entries} onDataRestored={handleDataRestored} customMoods={effectiveCustomMoods} />
         </div>
       ) : (
         <Statistics entries={entries} customMoods={effectiveCustomMoods} />
@@ -756,6 +777,7 @@ const App: React.FC = () => {
             <div className={`transition-transform duration-300 ${viewMode === ViewMode.TIMELINE ? 'scale-110 -translate-y-1' : ''}`}>
                <ICONS.Home />
             </div>
+            <span className="text-xs font-medium">主页</span>
           </button>
 
           <div className="w-[1px] h-8 bg-gray-200/50"></div>
@@ -767,8 +789,9 @@ const App: React.FC = () => {
             }`}
           >
             <div className={`transition-transform duration-300 ${viewMode === ViewMode.STATISTICS ? 'scale-110 -translate-y-1' : ''}`}>
-              <ICONS.Stats />
+              <ICONS.Chart />
             </div>
+            <span className="text-xs font-medium">情绪统计</span>
           </button>
 
           <div className="w-[1px] h-8 bg-gray-200/50"></div>
@@ -780,8 +803,9 @@ const App: React.FC = () => {
             }`}
           >
             <div className={`transition-transform duration-300 ${viewMode === ViewMode.ANALYSIS ? 'scale-110 -translate-y-1' : ''}`}>
-              <ICONS.Sparkles />
+              <ICONS.Brain />
             </div>
+            <span className="text-xs font-medium">记忆回溯</span>
           </button>
         </div>
       </nav>
