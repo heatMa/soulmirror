@@ -663,6 +663,86 @@ class DatabaseService {
   }
 
   /**
+   * 修复 V1 系统的旧版自定义心情分数（1-10 分制转换为 -10 到 +10 分制）
+   * 同时修复 diary_entries 表中对应条目的 mood_score 和 energy_delta
+   * 返回被修复的心情标签列表
+   */
+  async fixV1CustomMoodScores(): Promise<string[]> {
+    await this.ensureInitialized();
+    const customMoods = await this.getCustomMoods();
+    const fixedMoods: string[] = [];
+
+    for (const mood of customMoods) {
+      // V1 系统的分数范围是 1-10（都是正值）
+      // 检测：如果 score 在 1-10 之间（不包括 0 和负数），很可能是 V1 遗留数据
+      if (mood.score > 0 && mood.score <= 10) {
+        // 转换 V1 分数到 V2 分数
+        // V1: 1-4 (负面) -> V2: -8 到 -5
+        // V1: 5-6 (中性) -> V2: -2 到 +2
+        // V1: 7-10 (正面) -> V2: +5 到 +10
+        let newScore: number;
+        if (mood.score <= 4) {
+          // 负面情绪：1->-8, 2->-7, 3->-6, 4->-5
+          newScore = -9 + mood.score;
+        } else if (mood.score <= 6) {
+          // 中性情绪：5->-2, 6->+2
+          newScore = mood.score === 5 ? -2 : 2;
+        } else {
+          // 正面情绪：7->+5, 8->+6, 9->+8, 10->+10
+          newScore = mood.score === 7 ? 5 : mood.score === 8 ? 6 : mood.score === 9 ? 8 : 10;
+        }
+
+        // 更新 custom_moods 表中的分数
+        await this.saveCustomMood({
+          ...mood,
+          score: newScore
+        });
+
+        // 同时更新 diary_entries 表中所有该心情的条目
+        await this.fixEntriesForMood(mood.label, newScore);
+
+        fixedMoods.push(`${mood.label} (${mood.score} -> ${newScore})`);
+      }
+    }
+
+    return fixedMoods;
+  }
+
+  /**
+   * 修复指定心情的所有日记条目分数
+   */
+  private async fixEntriesForMood(moodLabel: string, newScore: number): Promise<void> {
+    await this.ensureInitialized();
+
+    if (this.isNative && this.db) {
+      // SQLite: 更新所有该心情的条目
+      await this.db.run(
+        'UPDATE diary_entries SET mood_score = ?, energy_delta = ?, score_version = ? WHERE mood = ? AND (mood_score > 0 OR energy_delta > 0)',
+        [newScore, newScore, 'v2', moodLabel]
+      );
+    } else {
+      // localStorage: 更新所有该心情的条目
+      const entries = await this.getAllEntries();
+      let updated = false;
+      const fixedEntries = entries.map(entry => {
+        if (entry.mood === moodLabel && (entry.moodScore > 0 || (entry.energyDelta ?? 0) > 0)) {
+          updated = true;
+          return {
+            ...entry,
+            moodScore: newScore,
+            energyDelta: newScore,
+            scoreVersion: 'v2' as const
+          };
+        }
+        return entry;
+      });
+      if (updated) {
+        localStorage.setItem(STORAGE_KEYS.ENTRIES, JSON.stringify(fixedEntries));
+      }
+    }
+  }
+
+  /**
    * 删除自定义心情（同时加入黑名单，防止自动迁移恢复）
    */
   async deleteCustomMood(label: string): Promise<void> {

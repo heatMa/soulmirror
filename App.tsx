@@ -78,6 +78,12 @@ const App: React.FC = () => {
         const defaultLabels = MOOD_OPTIONS.map(m => m.label);
         await databaseService.removeDuplicateCustomMoods(defaultLabels);
 
+        // 修复 V1 系统的旧版自定义心情分数
+        const fixedMoods = await databaseService.fixV1CustomMoodScores();
+        if (fixedMoods.length > 0) {
+          console.log('已修复 V1 系统自定义心情分数:', fixedMoods);
+        }
+
         setEntries(loadedEntries);
         setDailyNotes(loadedNotes);
         setCustomMoods(loadedCustomMoods);
@@ -225,7 +231,9 @@ const App: React.FC = () => {
         setEntries(prev => prev.map(e => e.id === updatedEntry.id ? updatedEntry : e));
 
         // AI 重新评分（能量系统）
-        const presetScore = formData.moodScore; // 预设分数
+        // 从 mood 配置中获取正确的预设分数，避免使用旧版系统的错误分数
+        const moodConfig = getMoodConfig(updatedEntry.mood);
+        const presetScore = moodConfig.score;
         evaluateMoodScore(updatedEntry.mood, updatedEntry.content, presetScore)
           .then(async (aiScore) => {
             if (aiScore !== undefined) {
@@ -290,12 +298,16 @@ const App: React.FC = () => {
           timestamp = targetTime.getTime();
         }
 
+        // 从 mood 配置中获取正确的预设分数
+        const moodConfig = getMoodConfig(formData.mood);
+        const initialScore = moodConfig.score;
+
         const entryData = {
           timestamp,
           content: formData.content,
           mood: formData.mood,
-          moodScore: formData.moodScore, // 预设分数，会被 AI 覆盖
-          energyDelta: formData.moodScore, // 初始使用预设分数，会被 AI 更新
+          moodScore: initialScore, // 使用 mood 配置的预设分数
+          energyDelta: initialScore, // 初始使用预设分数，会被 AI 更新
           scoreVersion: 'v2' as const,
           moodEmoji: formData.moodEmoji,
           moodHexColor: formData.moodHexColor,
@@ -309,7 +321,8 @@ const App: React.FC = () => {
         setEntries(prev => [newEntry, ...prev]);
 
         // AI 后台评分（能量系统）
-        const presetScore = formData.moodScore; // 预设分数
+        // 使用已获取的 moodConfig 中的预设分数
+        const presetScore = initialScore;
         evaluateMoodScore(newEntry.mood, newEntry.content, presetScore)
           .then(async (aiScore) => {
             if (aiScore !== undefined) {
