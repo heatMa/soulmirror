@@ -443,8 +443,9 @@ const App: React.FC = () => {
   const effectiveCustomMoods = useMemo(() => getEffectiveCustomMoods(customMoods), [customMoods]);
 
   const getMoodConfig = (moodLabel: string, entry?: DiaryEntry): MoodOption => {
-    const found = MOOD_OPTIONS.find(m => m.label === moodLabel) ||
-                  customMoods.find(m => m.label === moodLabel);
+    // 自定义心情优先于默认心情（允许用户覆盖默认心情的样式）
+    const found = customMoods.find(m => m.label === moodLabel) ||
+                  MOOD_OPTIONS.find(m => m.label === moodLabel);
 
     if (found) {
       // 如果 entry 中有保存的颜色/emoji，优先使用（因为用户可能自定义过）
@@ -831,6 +832,7 @@ const App: React.FC = () => {
           initialData={editingEntry}
           onSave={handleSaveEntry} 
           onClose={() => setShowAddForm(false)} 
+          customMoods={effectiveCustomMoods}
         />
       )}
       

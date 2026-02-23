@@ -10,6 +10,7 @@ interface Props {
   initialData?: DiaryEntry | null;
   onSave: (entry: Omit<DiaryEntry, 'id' | 'timestamp'> & { id?: string, timestamp?: number }) => void;
   onClose: () => void;
+  customMoods?: MoodOption[]; // 从父组件传入的自定义心情
 }
 
 // 富文本颜色选项
@@ -23,9 +24,12 @@ const TEXT_COLORS = [
   { value: '#8b5cf6', label: '紫色', borderClass: 'border-violet-500' },
 ];
 
-const DiaryEntryForm: React.FC<Props> = ({ initialData, onSave, onClose }) => {
+const DiaryEntryForm: React.FC<Props> = ({ initialData, onSave, onClose, customMoods: propCustomMoods }) => {
   const [selectedMood, setSelectedMood] = useState<MoodOption>(MOOD_OPTIONS[2]);
-  const [customMoods, setCustomMoods] = useState<MoodOption[]>([]);
+  const [internalCustomMoods, setInternalCustomMoods] = useState<MoodOption[]>([]);
+  
+  // 优先使用 props 传入的自定义心情
+  const customMoods = propCustomMoods ?? internalCustomMoods;
   const [builtinMoodOverrides, setBuiltinMoodOverrides] = useState<Record<string, Partial<MoodOption>>>({});
   const [newMoodInput, setNewMoodInput] = useState('');
   const [isAddingMood, setIsAddingMood] = useState(false);
@@ -81,8 +85,8 @@ const DiaryEntryForm: React.FC<Props> = ({ initialData, onSave, onClose }) => {
       if (contentRef.current) {
         contentRef.current.innerHTML = initialData.content || '';
       }
-      // 尝试查找匹配的心情，如果没有找到则创建一个临时的
-      const allMoods = [...MOOD_OPTIONS, ...getEffectiveCustomMoods(customMoods)];
+      // 尝试查找匹配的心情（自定义优先于默认），如果没有找到则创建一个临时的
+      const allMoods = [...getEffectiveCustomMoods(customMoods), ...MOOD_OPTIONS];
       const match = allMoods.find(m => m.label === initialData.mood);
       if (match) {
         setSelectedMood(match);
@@ -112,11 +116,14 @@ const DiaryEntryForm: React.FC<Props> = ({ initialData, onSave, onClose }) => {
   }, [initialData, customMoods]);
 
   useEffect(() => {
+    // 如果传入了 prop，不需要内部加载
+    if (propCustomMoods) return;
+    
     // 从数据库加载自定义心情
     databaseService.getCustomMoods()
-      .then(setCustomMoods)
+      .then(setInternalCustomMoods)
       .catch(e => console.error("Failed to load custom moods", e));
-  }, []);
+  }, [propCustomMoods]);
 
   const saveCustomMood = async (newMood: MoodOption) => {
     if (customMoods.some(m => m.label === newMood.label) || MOOD_OPTIONS.some(m => m.label === newMood.label)) {
@@ -125,7 +132,7 @@ const DiaryEntryForm: React.FC<Props> = ({ initialData, onSave, onClose }) => {
     try {
       await databaseService.saveCustomMood(newMood);
       const updated = [...customMoods, newMood];
-      setCustomMoods(updated);
+      setInternalCustomMoods(updated);
     } catch (e) {
       console.error("Failed to save custom mood", e);
     }
@@ -138,7 +145,7 @@ const DiaryEntryForm: React.FC<Props> = ({ initialData, onSave, onClose }) => {
     try {
       await databaseService.deleteCustomMood(label);
       const updated = customMoods.filter(m => m.label !== label);
-      setCustomMoods(updated);
+      setInternalCustomMoods(updated);
       // 如果当前选中的是被删除的心情，切换到默认心情
       if (selectedMood.label === label) {
         setSelectedMood(MOOD_OPTIONS[0]);
@@ -201,7 +208,7 @@ const DiaryEntryForm: React.FC<Props> = ({ initialData, onSave, onClose }) => {
       } else {
         await databaseService.saveCustomMood(updatedMood);
         const updated = customMoods.map(m => m.label === mood.label ? updatedMood : m);
-        setCustomMoods(updated);
+        setInternalCustomMoods(updated);
       }
 
       setSelectedMood(updatedMood);
@@ -226,7 +233,7 @@ const DiaryEntryForm: React.FC<Props> = ({ initialData, onSave, onClose }) => {
     } else {
       await databaseService.saveCustomMood(updatedMood);
       const updated = customMoods.map(m => m.label === mood.label ? updatedMood : m);
-      setCustomMoods(updated);
+      setInternalCustomMoods(updated);
     }
 
     setSelectedMood(updatedMood);

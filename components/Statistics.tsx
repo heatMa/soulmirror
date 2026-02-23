@@ -22,8 +22,8 @@ const Statistics: React.FC<Props> = ({ entries, customMoods }) => {
   const [isHeatmapExpanded, setIsHeatmapExpanded] = useState(false);
   const [isMoodDistExpanded, setIsMoodDistExpanded] = useState(false);
 
-  // 合并所有心情配置
-  const allMoods = useMemo(() => [...MOOD_OPTIONS, ...customMoods], [customMoods]);
+  // 合并所有心情配置（自定义优先于内置，允许覆盖）
+  const allMoods = useMemo(() => [...customMoods, ...MOOD_OPTIONS], [customMoods]);
 
   // 根据时间范围筛选条目
   const filteredEntriesByTime = useMemo(() => {

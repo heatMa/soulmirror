@@ -189,12 +189,13 @@ npm run build && npx wrangler pages deploy dist --project-name soulmirror --bran
 
 ### Android
 
-```bash
-# 构建并同步到 Android
-npm run build && npx cap sync android
+构建并同步到 Android 项目：
 
-# 然后用 Android Studio 打开 android 目录进行打包
+```bash
+npm run build && npx cap sync android
 ```
+
+然后在 Android Studio 中打开 `android` 目录进行打包。
 
 **AndroidManifest.xml** requires these permissions for notifications:
 - `POST_NOTIFICATIONS` (Android 13+)

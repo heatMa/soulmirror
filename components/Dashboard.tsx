@@ -10,9 +10,10 @@ import { Share } from '@capacitor/share';
 interface Props {
   entries: DiaryEntry[];
   onDataRestored?: () => void; // 数据恢复后的回调
+  customMoods?: MoodOption[]; // 从父组件传入的自定义心情
 }
 
-const Dashboard: React.FC<Props> = ({ entries, onDataRestored }) => {
+const Dashboard: React.FC<Props> = ({ entries, onDataRestored, customMoods: propCustomMoods }) => {
 
   // 导师系统状态
   const [selectedMentor, setSelectedMentor] = useState<MentorType>(DEFAULT_MENTOR);
@@ -46,7 +47,10 @@ const Dashboard: React.FC<Props> = ({ entries, onDataRestored }) => {
     }
   };
 
-  const [customMoods, setCustomMoods] = useState<MoodOption[]>([]);
+  const [internalCustomMoods, setInternalCustomMoods] = useState<MoodOption[]>([]);
+  
+  // 优先使用 props 传入的自定义心情，否则使用内部状态
+  const customMoods = propCustomMoods ?? internalCustomMoods;
 
   // Search & Filter State
   const [activeTag, setActiveTag] = useState<string | null>(null);
@@ -59,16 +63,19 @@ const Dashboard: React.FC<Props> = ({ entries, onDataRestored }) => {
   const [restoreMessage, setRestoreMessage] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Load custom moods for color mapping
+  // Load custom moods for color mapping（仅在未传入 prop 时加载）
   useEffect(() => {
+    if (propCustomMoods) return; // 如果传入了 prop，不需要内部加载
+    
     databaseService.getCustomMoods()
-      .then(setCustomMoods)
+      .then(setInternalCustomMoods)
       .catch(e => console.error("Failed to load custom moods", e));
-  }, []);
+  }, [propCustomMoods]);
 
   const getMoodConfig = (moodLabel: string) => {
-    return MOOD_OPTIONS.find(m => m.label === moodLabel) ||
-           customMoods.find(m => m.label === moodLabel) ||
+    // 自定义心情优先于默认心情（允许用户覆盖默认心情的样式）
+    return customMoods.find(m => m.label === moodLabel) ||
+           MOOD_OPTIONS.find(m => m.label === moodLabel) ||
            MOOD_OPTIONS[2]; // Default fallback
   };
 

@@ -104,8 +104,8 @@ const DailyMoodChart: React.FC<Props> = ({ entries, customMoods = [] }) => {
   const [tempStartHour, setTempStartHour] = useState(timeRange.startHour);
   const [tempEndHour, setTempEndHour] = useState(timeRange.endHour);
 
-  // 获取所有心情配置（内置 + 自定义）
-  const allMoodConfigs = [...MOOD_OPTIONS, ...customMoods];
+  // 获取所有心情配置（自定义优先于内置，允许覆盖）
+  const allMoodConfigs = [...customMoods, ...MOOD_OPTIONS];
 
   // 根据心情标签获取颜色
   const getMoodHexColor = (moodLabel: string, entry?: DiaryEntry): string => {

@@ -50,10 +50,11 @@ export const getHexFromTailwind = (tailwindClass: string): string => {
   return mapping[tailwindClass] || '#64748b';
 };
 
-// 过滤掉与默认心情重复的自定义心情，避免界面出现重复项
+// 获取有效的自定义心情列表
+// 自定义心情可以覆盖默认心情（同名标签优先使用自定义版本）
 export const getEffectiveCustomMoods = (customMoods: MoodOption[]): MoodOption[] => {
-  const defaultLabels = new Set(MOOD_OPTIONS.map(m => m.label));
-  return customMoods.filter(m => !defaultLabels.has(m.label));
+  // 只返回非空的自定义心情
+  return customMoods.filter(m => m.label && m.label.trim() !== '');
 };
 
 export const MOOD_OPTIONS: MoodOption[] = [

@@ -631,19 +631,23 @@ class DatabaseService {
   async saveCustomMood(mood: MoodOption): Promise<void> {
     await this.ensureInitialized();
 
+    // 确保 suggestions 是数组格式
+    const suggestionsArray = Array.isArray(mood.suggestions) ? mood.suggestions : [];
+
     if (this.isNative && this.db) {
       await this.db.run(
         `INSERT OR REPLACE INTO custom_moods (label, value, score, emoji, color, hex_color, shadow, suggestions)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-        [mood.label, mood.value, mood.score, mood.emoji, mood.color, mood.hexColor || null, mood.shadow, JSON.stringify(mood.suggestions)]
+        [mood.label, mood.value, mood.score, mood.emoji, mood.color, mood.hexColor || null, mood.shadow, JSON.stringify(suggestionsArray)]
       );
     } else {
       const moods = await this.getCustomMoods();
       const index = moods.findIndex(m => m.label === mood.label);
+      const moodToSave = { ...mood, suggestions: suggestionsArray };
       if (index !== -1) {
-        moods[index] = mood;
+        moods[index] = moodToSave;
       } else {
-        moods.push(mood);
+        moods.push(moodToSave);
       }
       localStorage.setItem(STORAGE_KEYS.CUSTOM_MOODS, JSON.stringify(moods));
     }
@@ -858,11 +862,30 @@ class DatabaseService {
         for (const entry of backupData.data.entries) {
           try {
             if (this.isNative && this.db) {
-              // SQLite: 使用 INSERT OR REPLACE
+              // SQLite: 使用 INSERT OR REPLACE，包含所有字段
               await this.db.run(
-                `INSERT OR REPLACE INTO diary_entries (id, timestamp, mood, mood_score, mood_emoji, mood_hex_color, content, tags)
-                 VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-                [entry.id, entry.timestamp, entry.mood, entry.moodScore, entry.moodEmoji || null, entry.moodHexColor || null, entry.content, JSON.stringify(entry.tags)]
+                `INSERT OR REPLACE INTO diary_entries (
+                  id, timestamp, mood, mood_score, mood_emoji, mood_hex_color, 
+                  content, tags, ai_reply, ai_suggestions, 
+                  end_timestamp, duration, is_active, energy_delta, score_version
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                [
+                  entry.id, 
+                  entry.timestamp, 
+                  entry.mood, 
+                  entry.moodScore ?? entry.energyDelta ?? 0, 
+                  entry.moodEmoji || null, 
+                  entry.moodHexColor || null, 
+                  entry.content, 
+                  JSON.stringify(entry.tags || []),
+                  entry.aiReply || null,
+                  JSON.stringify(entry.aiSuggestions || []),
+                  entry.endTimestamp || null,
+                  entry.duration || null,
+                  entry.isActive ? 1 : 0,
+                  entry.energyDelta ?? entry.moodScore ?? 0,
+                  entry.scoreVersion || 'v2'
+                ]
               );
             } else {
               // localStorage: 合并条目
@@ -887,9 +910,33 @@ class DatabaseService {
       // 导入每日笔记
       if (backupData.data.dailyNotes && typeof backupData.data.dailyNotes === 'object') {
         const noteEntries = Object.entries(backupData.data.dailyNotes);
-        for (const [dateStr, content] of noteEntries) {
+        for (const [dateStr, noteData] of noteEntries) {
           try {
-            await this.saveDailyNote(dateStr, content);
+            // 处理两种格式：旧格式直接是字符串，新格式是对象
+            const noteContent = typeof noteData === 'string' ? noteData : (noteData as any)?.content || '';
+            const deepReflection = (noteData as any)?.deepReflection;
+            const deepReflectionSource = (noteData as any)?.deepReflectionSource;
+            const deepReflectionTimestamp = (noteData as any)?.deepReflectionTimestamp;
+
+            if (this.isNative && this.db) {
+              // SQLite: 使用 INSERT OR REPLACE 保存完整笔记数据
+              await this.db.run(
+                `INSERT OR REPLACE INTO daily_notes (date_str, content, deep_reflection, deep_reflection_source, deep_reflection_timestamp)
+                 VALUES (?, ?, ?, ?, ?)`,
+                [dateStr, noteContent, deepReflection || null, deepReflectionSource || null, deepReflectionTimestamp || null]
+              );
+            } else {
+              // localStorage: 合并笔记数据
+              const notes = await this.getAllDailyNotes();
+              notes[dateStr] = {
+                date: dateStr,
+                content: noteContent,
+                deepReflection,
+                deepReflectionSource,
+                deepReflectionTimestamp
+              };
+              localStorage.setItem(STORAGE_KEYS.NOTES, JSON.stringify(notes));
+            }
             result.notesImported++;
           } catch (err) {
             result.errors.push(`导入笔记失败: ${dateStr}`);
@@ -901,10 +948,32 @@ class DatabaseService {
       if (backupData.data.customMoods && Array.isArray(backupData.data.customMoods)) {
         for (const mood of backupData.data.customMoods) {
           try {
-            await this.saveCustomMood(mood);
+            // 规范化心情数据，确保所有必需字段存在
+            const normalizedMood: MoodOption = {
+              label: mood.label || '',
+              value: mood.value || mood.label || '',
+              score: typeof mood.score === 'number' ? mood.score : 5,
+              emoji: mood.emoji || '😊',
+              color: mood.color || 'bg-gray-400',
+              hexColor: mood.hexColor,
+              shadow: mood.shadow || 'shadow-gray-200',
+              // 处理 suggestions 可能是字符串或数组的情况
+              suggestions: Array.isArray(mood.suggestions) 
+                ? mood.suggestions 
+                : (typeof mood.suggestions === 'string' 
+                    ? JSON.parse(mood.suggestions || '[]') 
+                    : [])
+            };
+            
+            if (!normalizedMood.label) {
+              result.errors.push(`导入自定义心情失败: 心情标签为空`);
+              continue;
+            }
+            
+            await this.saveCustomMood(normalizedMood);
             result.moodsImported++;
           } catch (err) {
-            result.errors.push(`导入自定义心情失败: ${mood.label}`);
+            result.errors.push(`导入自定义心情失败: ${mood.label || '未知标签'}`);
           }
         }
       }

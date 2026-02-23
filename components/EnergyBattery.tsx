@@ -51,8 +51,8 @@ const EnergyBattery: React.FC<Props> = ({ entries, allEntries, customMoods = [] 
     return () => window.removeEventListener('resize', updateWidth);
   }, []);
 
-  // 获取所有心情配置（内置 + 自定义）
-  const allMoodConfigs = [...MOOD_OPTIONS, ...customMoods];
+  // 获取所有心情配置（自定义优先于内置，允许覆盖）
+  const allMoodConfigs = [...customMoods, ...MOOD_OPTIONS];
 
   // 根据心情标签获取配置
   const getMoodConfig = (moodLabel: string): MoodOption | undefined => {
