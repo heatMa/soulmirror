@@ -57,17 +57,12 @@ export const getEffectiveCustomMoods = (customMoods: MoodOption[]): MoodOption[]
 };
 
 export const MOOD_OPTIONS: MoodOption[] = [
-  { label: '开心', value: 'happy', score: 8, emoji: '😊', color: 'bg-emerald-500', hexColor: '#10b981', shadow: 'shadow-emerald-200', suggestions: ['顺利', '收获', '惊喜'] },
+  { label: '心流', value: 'flow', score: 10, emoji: '🌊', color: 'bg-cyan-500', hexColor: '#06b6d4', shadow: 'shadow-cyan-200', suggestions: ['专注', '沉浸', '忘我'] },
+  { label: '开心', value: 'happy', score: 7, emoji: '😊', color: 'bg-emerald-500', hexColor: '#10b981', shadow: 'shadow-emerald-200', suggestions: ['顺利', '收获', '惊喜'] },
   { label: '平静', value: 'calm', score: 1, emoji: '😌', color: 'bg-sky-400', hexColor: '#38bdf8', shadow: 'shadow-sky-200', suggestions: ['放松', '舒适', '安心'] },
-  { label: '心慌', value: 'panic', score: -3, emoji: '😨', color: 'bg-amber-400', hexColor: '#fbbf24', shadow: 'shadow-amber-200', suggestions: ['紧张', '不安', '心跳加速'] },
-  { label: '沉溺', value: 'indulge', score: -4, emoji: '🫠', color: 'bg-purple-400', hexColor: '#c084fc', shadow: 'shadow-purple-200', suggestions: ['放纵', '沉浸', '停不下来'] },
-  { label: '无精力', value: 'low_energy', score: -5, emoji: '😶', color: 'bg-slate-400', hexColor: '#94a3b8', shadow: 'shadow-slate-200', suggestions: ['疲倦', '提不起劲', '空'] },
-  { label: '疲惫', value: 'tired', score: -5, emoji: '😩', color: 'bg-indigo-400', hexColor: '#818cf8', shadow: 'shadow-indigo-200', suggestions: ['累了', '困倦', '需要休息'] },
-  { label: '反刍', value: 'ruminate', score: -6, emoji: '🔄', color: 'bg-teal-500', hexColor: '#14b8a6', shadow: 'shadow-teal-200', suggestions: ['反复想', '纠结', '想太多'] },
-  { label: '焦虑', value: 'anxious', score: -6, emoji: '😰', color: 'bg-amber-500', hexColor: '#f59e0b', shadow: 'shadow-amber-200', suggestions: ['压力', '担心', '紧张'] },
+  { label: '疲惫', value: 'tired', score: -3, emoji: '😩', color: 'bg-indigo-400', hexColor: '#818cf8', shadow: 'shadow-indigo-200', suggestions: ['累了', '困倦', '需要休息'] },
+  { label: '焦虑', value: 'anxious', score: -5, emoji: '😰', color: 'bg-amber-500', hexColor: '#f59e0b', shadow: 'shadow-amber-200', suggestions: ['压力', '担心', '紧张'] },
   { label: '难过', value: 'sad', score: -8, emoji: '😢', color: 'bg-blue-500', hexColor: '#3b82f6', shadow: 'shadow-blue-200', suggestions: ['失落', '委屈', '伤心'] },
-  { label: '生气', value: 'angry', score: -10, emoji: '😠', color: 'bg-rose-500', hexColor: '#f43f5e', shadow: 'shadow-rose-200', suggestions: ['不满', '烦躁', '愤怒'] },
-  { label: '内耗', value: 'mental_drain', score: -10, emoji: '🌀', color: 'bg-gray-600', hexColor: '#4b5563', shadow: 'shadow-gray-200', suggestions: ['自我消耗', '精神内耗', '耗尽'] },
 ];
 
 export const ICONS = {
