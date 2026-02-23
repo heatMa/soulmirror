@@ -64,7 +64,7 @@ const App: React.FC = () => {
         await databaseService.initialize();
         
         // 并行加载所有数据
-        const [loadedEntries, loadedNotes, loadedCustomMoods, userSettings] = await Promise.all([
+        let [loadedEntries, loadedNotes, loadedCustomMoods, userSettings] = await Promise.all([
           databaseService.getAllEntries(),
           databaseService.getAllDailyNotes(),
           databaseService.getCustomMoods(),
@@ -82,6 +82,9 @@ const App: React.FC = () => {
         const fixedMoods = await databaseService.fixV1CustomMoodScores();
         if (fixedMoods.length > 0) {
           console.log('已修复 V1 系统自定义心情分数:', fixedMoods);
+          // 如果有修复，重新加载数据以获取更新后的分数
+          loadedEntries = await databaseService.getAllEntries();
+          loadedCustomMoods = await databaseService.getCustomMoods();
         }
 
         setEntries(loadedEntries);
