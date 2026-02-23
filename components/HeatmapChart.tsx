@@ -98,7 +98,7 @@ const HeatmapChart: React.FC<Props> = ({ entries, allMoods }) => {
 
         {/* 热力图主体 */}
         {WEEKDAYS.map((day, weekdayIndex) => (
-          <div key={day} className="flex items-center mb-0.5">
+          <div key={day} className="flex items-center mb-[2px]">
             {/* 星期标签 */}
             <div className="w-8 flex-shrink-0 text-[10px] text-gray-500 font-medium pr-1 text-right">
               {day}
@@ -113,10 +113,11 @@ const HeatmapChart: React.FC<Props> = ({ entries, allMoods }) => {
                 return (
                   <div
                     key={hour}
-                    className="aspect-square rounded-sm transition-all hover:scale-110 cursor-pointer group relative"
+                    className="aspect-square rounded-[2px] transition-all hover:scale-110 cursor-pointer group relative"
                     style={{
                       backgroundColor: cell.count > 0 ? bgColor : '#f1f5f9',
-                      opacity: cell.count > 0 ? opacity : 1
+                      opacity: cell.count > 0 ? opacity : 1,
+                      maxHeight: '14px' // 限制格子高度，使热力图更紧凑
                     }}
                     title={cell.count > 0
                       ? `${day} ${hour}:00 - ${cell.dominantMood} (${cell.count}次)`

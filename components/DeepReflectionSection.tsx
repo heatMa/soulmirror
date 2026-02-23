@@ -34,14 +34,6 @@ const DeepReflectionSection: React.FC<Props> = ({ selectedDate, moodEntries }) =
     loadJournalData();
   }, [dateStr]);
 
-  // Restore expansion state from localStorage
-  useEffect(() => {
-    const savedState = localStorage.getItem('deepReflectionExpanded');
-    if (savedState !== null) {
-      setIsExpanded(JSON.parse(savedState));
-    }
-  }, []);
-
   const loadJournalData = async () => {
     try {
       const note = await databaseService.getDailyNote(dateStr);
@@ -118,9 +110,7 @@ const DeepReflectionSection: React.FC<Props> = ({ selectedDate, moodEntries }) =
   };
 
   const toggleExpanded = () => {
-    const newState = !isExpanded;
-    setIsExpanded(newState);
-    localStorage.setItem('deepReflectionExpanded', JSON.stringify(newState));
+    setIsExpanded(!isExpanded);
   };
 
   const toggleReflectionCollapse = () => {

@@ -1,9 +1,8 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine, ReferenceArea, Scatter, ComposedChart, Bar, Cell } from 'recharts';
+import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine, ReferenceArea } from 'recharts';
 import { DiaryEntry } from '../types';
 import { MOOD_OPTIONS, MoodOption, getHexFromTailwind } from '../constants';
-import { calculateDailyEnergy, DAILY_STARTING_ENERGY } from '../utils/energyUtils';
 import { getEntryDurationMinutes } from '../utils/timeUtils';
 
 interface Props {
@@ -13,8 +12,7 @@ interface Props {
 
 interface ChartDataPoint {
   hour: number;
-  energy: number | null; // 累计电量
-  delta?: number; // 本次能量变化
+  delta: number; // 能量变化（相对值）
   mood?: string;
   content?: string;
   time?: string;
@@ -56,7 +54,6 @@ const saveTimeRange = (range: TimeRangeSettings) => {
 const CustomTooltip = ({ active, payload }: any) => {
   if (active && payload && payload.length) {
     const data = payload[0].payload;
-    if (data.energy === null) return null;
 
     return (
       <div className="bg-white/90 backdrop-blur-md px-3 py-2 rounded-xl shadow-lg border border-white/50 text-left z-50">
@@ -73,12 +70,9 @@ const CustomTooltip = ({ active, payload }: any) => {
             {data.content}
         </p>
         <div className="text-[11px] font-mono text-gray-700 mt-1">
-          <span>剩余: {Math.round(data.energy)}分</span>
-          {data.delta !== undefined && (
-            <span className="ml-2" style={{ color: data.delta >= 0 ? '#10b981' : '#f43f5e' }}>
-              {data.delta >= 0 ? '+' : ''}{data.delta}分
-            </span>
-          )}
+          <span style={{ color: data.delta >= 0 ? '#10b981' : '#f43f5e', fontWeight: 'bold' }}>
+            {data.delta >= 0 ? '+' : ''}{data.delta}分
+          </span>
         </div>
       </div>
     );
@@ -89,7 +83,7 @@ const CustomTooltip = ({ active, payload }: any) => {
 // 自定义数据点组件
 const CustomDot = (props: any) => {
   const { cx, cy, payload } = props;
-  if (payload.energy === null || cx === undefined || cy === undefined) return null;
+  if (cx === undefined || cy === undefined) return null;
 
   return (
     <circle
@@ -128,20 +122,16 @@ const DailyMoodChart: React.FC<Props> = ({ entries, customMoods = [] }) => {
 
   if (!entries || entries.length === 0) return null;
 
-  // 计算累计电量数据
-  const energyLevels = useMemo(() => calculateDailyEnergy(entries), [entries]);
-
-  // 将条目转换为图表数据点（包含累计电量）
+  // 将条目转换为图表数据点（只显示能量变化量）
   const entryPoints: ChartDataPoint[] = useMemo(() => {
     const points = [...entries]
       .sort((a, b) => a.timestamp - b.timestamp)
-      .map((e, index) => {
+      .map((e) => {
         const date = new Date(e.timestamp);
         const hour = date.getHours() + date.getMinutes() / 60;
         return {
           hour,
-          energy: energyLevels[index],
-          delta: e.energyDelta ?? e.moodScore ?? 0,  // 确保 delta 始终有值
+          delta: e.energyDelta ?? 0,  // 使用 energyDelta 字段
           mood: e.mood,
           content: e.content,
           time: date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
@@ -149,15 +139,8 @@ const DailyMoodChart: React.FC<Props> = ({ entries, customMoods = [] }) => {
         };
       });
 
-    // 调试：打印数据点信息
-    console.log('DailyMoodChart entryPoints:', points.map(p => ({
-      hour: p.hour,
-      delta: p.delta,
-      energy: p.energy
-    })));
-
     return points;
-  }, [entries, energyLevels]);
+  }, [entries]);
 
   // 有持续时间的记录，用于绘制背景色块
   const durationRanges = useMemo(() => {
@@ -182,21 +165,11 @@ const DailyMoodChart: React.FC<Props> = ({ entries, customMoods = [] }) => {
   // 获取当前小时用于显示参考线
   const currentHour = new Date().getHours() + new Date().getMinutes() / 60;
 
-  // 计算当天情绪电量的平均值
-  const averageEnergy = useMemo(() => {
-    if (entryPoints.length === 0) return DAILY_STARTING_ENERGY;
-    return entryPoints.reduce((sum, point) => sum + (point.energy || 0), 0) / entryPoints.length;
+  // 计算平均能量变化值
+  const averageDelta = useMemo(() => {
+    if (entryPoints.length === 0) return 0;
+    return entryPoints.reduce((sum, point) => sum + point.delta, 0) / entryPoints.length;
   }, [entryPoints]);
-
-  // 计算图表的最大电量值（用于动态Y轴范围）
-  const maxEnergy = useMemo(() => {
-    if (entryPoints.length === 0) return DAILY_STARTING_ENERGY;
-    const max = Math.max(...entryPoints.map(p => p.energy || 0));
-    return Math.max(DAILY_STARTING_ENERGY, max + 10);
-  }, [entryPoints]);
-
-  // 右侧 Y 轴固定范围：-10 到 +10
-  const maxDelta = 10;
 
   // 生成横轴刻度
   const generateTicks = () => {
@@ -293,11 +266,20 @@ const DailyMoodChart: React.FC<Props> = ({ entries, customMoods = [] }) => {
         </div>
       )}
 
-      <div className="h-[calc(100%-1.5rem)] w-full -ml-2">
+      <div className="h-[calc(100%-1.5rem)] w-full">
         <ResponsiveContainer width="100%" height="100%">
-          <ComposedChart data={entryPoints} margin={{ top: 5, right: 35, left: -20, bottom: 0 }}>
-            {/* 移除渐变色背景 */}
-            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(0,0,0,0.03)" />
+          <AreaChart data={entryPoints} margin={{ top: 5, right: 45, left: 0, bottom: 0 }}>
+            <defs>
+              <linearGradient id="colorDeltaPositive" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="5%" stopColor="#10b981" stopOpacity={0.3}/>
+                <stop offset="95%" stopColor="#10b981" stopOpacity={0}/>
+              </linearGradient>
+              <linearGradient id="colorDeltaNegative" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="5%" stopColor="#f43f5e" stopOpacity={0}/>
+                <stop offset="95%" stopColor="#f43f5e" stopOpacity={0.3}/>
+              </linearGradient>
+            </defs>
+            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(0,0,0,0.05)" />
             <XAxis
               dataKey="hour"
               type="number"
@@ -309,71 +291,50 @@ const DailyMoodChart: React.FC<Props> = ({ entries, customMoods = [] }) => {
               ticks={generateTicks()}
               tickFormatter={(value) => `${Math.floor(value)}:00`}
             />
-            {/* 左侧Y轴：累计能量 */}
+            {/* Y轴：能量变化量（固定范围 -10 到 +10） */}
             <YAxis
-              yAxisId="left"
-              domain={[0, maxEnergy]}
-              axisLine={false}
-              tickLine={false}
-              tick={{fontSize: 9, fill: '#9ca3af'}}
-              ticks={[0, 50, 100, Math.round(maxEnergy)]}
-            />
-            {/* 右侧Y轴：能量变化量（固定范围 -10 到 +10） */}
-            <YAxis
-              yAxisId="right"
-              orientation="right"
               domain={[-10, 10]}
               axisLine={false}
               tickLine={false}
               tick={{fontSize: 9, fill: '#9ca3af'}}
               ticks={[-10, -5, 0, 5, 10]}
-              width={35}
+              width={25}
             />
+            {/* 当前时间参考线 */}
             <ReferenceLine x={currentHour} stroke="#e5e7eb" strokeDasharray="3 3" />
-            {/* 100分基准线（左轴） */}
+            {/* 零基准线 */}
             <ReferenceLine
-              yAxisId="left"
-              y={DAILY_STARTING_ENERGY}
-              stroke="#10b981"
-              strokeDasharray="6 4"
+              y={0}
+              stroke="#64748b"
               strokeWidth={1.5}
               label={{
-                value: '100',
+                value: '0',
                 position: 'left',
                 fontSize: 9,
-                fill: '#10b981',
+                fill: '#64748b',
                 fontWeight: 'bold'
               }}
             />
-            {/* 平均电量虚线（左轴） */}
+            {/* 平均能量变化线 */}
             <ReferenceLine
-              yAxisId="left"
-              y={averageEnergy}
-              stroke="#f43f5e"
+              y={averageDelta}
+              stroke="#f59e0b"
               strokeDasharray="6 4"
               strokeWidth={1.5}
               label={{
-                value: `平均${averageEnergy.toFixed(0)}`,
+                value: `平均${averageDelta >= 0 ? '+' : ''}${averageDelta.toFixed(1)}`,
                 position: 'right',
                 fontSize: 9,
-                fill: '#f43f5e',
+                fill: '#f59e0b',
                 fontWeight: 'bold'
               }}
             />
-            {/* 变化量的零线（右轴） */}
-            <ReferenceLine
-              yAxisId="right"
-              y={0}
-              stroke="rgba(0,0,0,0.1)"
-              strokeWidth={0.5}
-            />
-            {/* 持续时间色块（背景层，放在 Bar 和 Area 之前） */}
+            {/* 持续时间色块（背景层） */}
             {durationRanges.map((range, i) => {
               const ReferenceAreaAny = ReferenceArea as any;
               return (
                 <ReferenceAreaAny
                   key={`duration-${i}`}
-                  yAxisId="left"
                   x1={range.x1}
                   x2={range.x2}
                   fill={range.hexColor}
@@ -384,40 +345,21 @@ const DailyMoodChart: React.FC<Props> = ({ entries, customMoods = [] }) => {
             })}
             <Tooltip
                 content={<CustomTooltip />}
-                cursor={{ stroke: '#10b981', strokeWidth: 1, strokeDasharray: '4 4' }}
+                cursor={{ stroke: '#6366f1', strokeWidth: 1, strokeDasharray: '4 4' }}
             />
-            {/* 能量变化柱状图（右轴，双向） - 先渲染在背景 */}
-            <Bar
-              yAxisId="right"
-              dataKey="delta"
-              animationDuration={800}
-              barSize={10}
-              maxBarSize={10}
-              radius={[4, 4, 4, 4]}
-            >
-              {entryPoints.map((entry, index) => (
-                <Cell
-                  key={`cell-${index}`}
-                  fill={entry.delta && entry.delta > 0 ? '#10b981' : '#f43f5e'}
-                  opacity={0.5}
-                />
-              ))}
-            </Bar>
-            {/* 累计能量曲线（左轴） - 后渲染在前景 */}
+            {/* 能量变化面积图 */}
             <Area
-              yAxisId="left"
               type="monotone"
-              dataKey="energy"
-              stroke="#3b82f6"
+              dataKey="delta"
+              stroke="#6366f1"
               strokeWidth={3}
-              fillOpacity={0}
-              fill="none"
+              fillOpacity={1}
+              fill="url(#colorDeltaPositive)"
               animationDuration={1000}
-              connectNulls
               dot={<CustomDot />}
               activeDot={{ r: 6, strokeWidth: 2 }}
             />
-          </ComposedChart>
+          </AreaChart>
         </ResponsiveContainer>
       </div>
     </div>

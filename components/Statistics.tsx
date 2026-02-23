@@ -18,6 +18,10 @@ const Statistics: React.FC<Props> = ({ entries, customMoods }) => {
   const [customStartDate, setCustomStartDate] = useState<string>('');
   const [customEndDate, setCustomEndDate] = useState<string>('');
 
+  // 折叠状态管理
+  const [isHeatmapExpanded, setIsHeatmapExpanded] = useState(false);
+  const [isMoodDistExpanded, setIsMoodDistExpanded] = useState(false);
+
   // 合并所有心情配置
   const allMoods = useMemo(() => [...MOOD_OPTIONS, ...customMoods], [customMoods]);
 
@@ -156,10 +160,10 @@ const Statistics: React.FC<Props> = ({ entries, customMoods }) => {
 
       {/* 心情筛选 */}
       <div className="mb-4 px-2">
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap gap-1.5">
           <button
             onClick={() => setSelectedMoodFilter(null)}
-            className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+            className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-all ${
               !selectedMoodFilter
                 ? 'bg-gray-800 text-white'
                 : 'bg-white/80 text-gray-500 hover:bg-white'
@@ -173,7 +177,7 @@ const Statistics: React.FC<Props> = ({ entries, customMoods }) => {
               onClick={() => setSelectedMoodFilter(
                 selectedMoodFilter === mood.label ? null : mood.label
               )}
-              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all flex items-center gap-1 ${
+              className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-all flex items-center gap-1 ${
                 selectedMoodFilter === mood.label
                   ? 'text-white shadow-sm'
                   : 'bg-white/80 text-gray-500 hover:bg-white'
@@ -189,52 +193,93 @@ const Statistics: React.FC<Props> = ({ entries, customMoods }) => {
         </div>
       </div>
 
-      {/* 记录日历（月历热力图） */}
+      {/* 周热力图 - 可折叠 */}
       <div className="mb-4">
-        <div className="glass-card rounded-[2rem] p-4">
-          <h3 className="text-sm font-bold text-gray-600 mb-3 px-1">记录日历</h3>
-          <HeatmapChart entries={filteredEntriesByTime} allMoods={allMoods} />
+        <div className="glass-card rounded-[2rem] overflow-hidden">
+          {/* 可点击的标题栏 */}
+          <button
+            onClick={() => setIsHeatmapExpanded(!isHeatmapExpanded)}
+            className="w-full px-4 py-3 flex items-center justify-between hover:bg-white/30 transition-colors"
+          >
+            <div className="flex items-center gap-2">
+              <div className={`transition-transform duration-300 ${isHeatmapExpanded ? 'rotate-90' : ''}`}>
+                <ICONS.ChevronRight />
+              </div>
+              <h3 className="text-xs font-bold text-gray-500">周热力图</h3>
+              <span className="text-[10px] text-gray-400 font-medium">
+                {filteredEntriesByTime.length} 条记录
+              </span>
+            </div>
+          </button>
+
+          {/* 展开内容 */}
+          {isHeatmapExpanded && (
+            <div className="px-4 pb-4 pt-2 border-t border-gray-100 animate-in fade-in slide-in-from-top-2 duration-300">
+              <HeatmapChart entries={filteredEntriesByTime} allMoods={allMoods} />
+            </div>
+          )}
         </div>
       </div>
 
-      {/* 心情分布 */}
+      {/* 心情分布 - 可折叠 */}
       <div className="mb-4">
-        <div className="glass-card rounded-[2rem] p-4">
-          <h3 className="text-sm font-bold text-gray-600 mb-3 px-1">心情分布</h3>
-          <div className="space-y-2">
-            {moodStats.slice(0, 10).map((stat, index) => {
-              const maxCount = moodStats[0]?.count || 1;
-              const percentage = (stat.count / maxCount) * 100;
-              const hexColor = stat.config?.hexColor || getHexFromTailwind(stat.config?.color || 'bg-gray-400');
+        <div className="glass-card rounded-[2rem] overflow-hidden">
+          {/* 可点击的标题栏 */}
+          <button
+            onClick={() => setIsMoodDistExpanded(!isMoodDistExpanded)}
+            className="w-full px-4 py-3 flex items-center justify-between hover:bg-white/30 transition-colors"
+          >
+            <div className="flex items-center gap-2">
+              <div className={`transition-transform duration-300 ${isMoodDistExpanded ? 'rotate-90' : ''}`}>
+                <ICONS.ChevronRight />
+              </div>
+              <h3 className="text-xs font-bold text-gray-500">心情分布</h3>
+              <span className="text-[10px] text-gray-400 font-medium">
+                {moodStats.length > 0 ? `Top ${Math.min(moodStats.length, 10)}` : '暂无数据'}
+              </span>
+            </div>
+          </button>
 
-              return (
-                <button
-                  key={stat.mood}
-                  onClick={() => {
-                    setSelectedMoodFilter(stat.mood);
-                  }}
-                  className="w-full text-left"
-                >
-                  <div className="flex items-center gap-2 mb-1">
-                    <span className="text-base">{stat.config?.emoji || '🏷️'}</span>
-                    <span className="text-sm font-medium text-gray-700">{stat.mood}</span>
-                    <span className="text-xs text-gray-400 ml-auto">
-                      {stat.count}次 ({Math.round((stat.count / filteredEntriesByTime.length) * 100)}%)
-                    </span>
-                  </div>
-                  <div className="ml-7 h-2 bg-gray-100 rounded-full overflow-hidden">
-                    <div
-                      className="h-full rounded-full transition-all"
-                      style={{
-                        width: `${percentage}%`,
-                        backgroundColor: hexColor
+          {/* 展开内容 */}
+          {isMoodDistExpanded && (
+            <div className="px-4 pb-4 pt-2 border-t border-gray-100 animate-in fade-in slide-in-from-top-2 duration-300">
+              <div className="space-y-2">
+                {moodStats.slice(0, 10).map((stat, index) => {
+                  const maxCount = moodStats[0]?.count || 1;
+                  const percentage = (stat.count / maxCount) * 100;
+                  const hexColor = stat.config?.hexColor || getHexFromTailwind(stat.config?.color || 'bg-gray-400');
+
+                  return (
+                    <button
+                      key={stat.mood}
+                      onClick={() => {
+                        setSelectedMoodFilter(stat.mood);
+                        setIsMoodDistExpanded(false); // 选择后自动折叠
                       }}
-                    />
-                  </div>
-                </button>
-              );
-            })}
-          </div>
+                      className="w-full text-left"
+                    >
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="text-base">{stat.config?.emoji || '🏷️'}</span>
+                        <span className="text-sm font-medium text-gray-700">{stat.mood}</span>
+                        <span className="text-xs text-gray-400 ml-auto">
+                          {stat.count}次 ({Math.round((stat.count / filteredEntriesByTime.length) * 100)}%)
+                        </span>
+                      </div>
+                      <div className="ml-7 h-2 bg-gray-100 rounded-full overflow-hidden">
+                        <div
+                          className="h-full rounded-full transition-all"
+                          style={{
+                            width: `${percentage}%`,
+                            backgroundColor: hexColor
+                          }}
+                        />
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
