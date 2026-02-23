@@ -45,7 +45,7 @@ CREATE TABLE IF NOT EXISTS custom_moods (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   label TEXT NOT NULL UNIQUE,
   value TEXT NOT NULL,
-  score INTEGER DEFAULT 5,
+  score INTEGER DEFAULT 0,  -- V2 系统默认 0（中性），V1 遗留是 5
   emoji TEXT NOT NULL,
   color TEXT NOT NULL,
   hex_color TEXT,
@@ -369,7 +369,7 @@ class DatabaseService {
   }
 
   /**
-   * 更新日记条目的心情评分
+   * 更新日记条目的心情能量值（-10到+10，负数=负面情绪）
    */
   async updateEntryMoodScore(id: string, moodScore: number): Promise<void> {
     await this.ensureInitialized();
@@ -976,7 +976,7 @@ class DatabaseService {
             const normalizedMood: MoodOption = {
               label: mood.label || '',
               value: mood.value || mood.label || '',
-              score: typeof mood.score === 'number' ? mood.score : 5,
+              score: typeof mood.score === 'number' ? mood.score : 0,  // V2 系统默认 0
               emoji: mood.emoji || '😊',
               color: mood.color || 'bg-gray-400',
               hexColor: mood.hexColor,

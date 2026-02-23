@@ -234,11 +234,6 @@ const TimelineItem: React.FC<Props> = ({
                     {formatEnergyDisplay(entry.energyDelta, energyRemaining)}
                   </span>
                 )}
-                {entry.energyDelta === undefined && entry.moodScore > 0 && (
-                  <span className="text-sm font-bold" style={{ color: moodHexColor }}>
-                    {entry.moodScore.toFixed(1)}分（旧系统）
-                  </span>
-                )}
               </div>
             </div>
 

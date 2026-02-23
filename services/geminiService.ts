@@ -144,6 +144,20 @@ function cleanJsonString(str: string): string {
 // 🚀 业务逻辑导出
 // ==========================================
 
+/**
+ * 根据心情标签关键词判断应该是正面还是负面
+ * 用于校正 AI 生成的错误分数
+ */
+const getExpectedScoreSign = (label: string): number | null => {
+  const negativeKeywords = ['崩溃', '内耗', '难过', '伤心', '痛苦', '绝望', '焦虑', '抑郁', '愤怒', '生气', '烦躁', '疲惫', '累', '纠结', '内疚', '后悔', '失望', '沮丧', '郁闷', '不爽', '糟', '烂', '差', '坏', '烦', '恼', '愁', '悲', '哀', '惨', '恐', '惧', '怕', '慌', '乱', '急', '躁'];
+  const positiveKeywords = ['开心', '快乐', '幸福', '满足', '愉快', '兴奋', '激动', '惊喜', '棒', '好', '爽', '赞', '爱', '喜欢', '乐', '笑', '甜', '美', '优', '良', '佳', '安', '静', '平', '和', '宁', '舒', '畅', '顺', '畅', '赢', '胜', '成', '喜', '欢', '悦', '怡', '快', '畅', '爽', '酷', '赞'];
+  
+  const lowerLabel = label.toLowerCase();
+  if (negativeKeywords.some(kw => lowerLabel.includes(kw))) return -1;
+  if (positiveKeywords.some(kw => lowerLabel.includes(kw))) return 1;
+  return null; // 无法确定
+};
+
 export const generateMoodMetadata = async (moodLabel: string): Promise<Partial<MoodOption>> => {
   // --- 提示词 ---
   const promptText = `
@@ -159,18 +173,23 @@ export const generateMoodMetadata = async (moodLabel: string): Promise<Partial<M
       "score": -10 到 +10 的整数评分（新能量系统）
     }
 
-    颜色规则:
-    - 正面/平静 -> 绿色、青色、蓝绿色系 (bg-emerald-500/#10b981, bg-teal-500/#14b8a6, bg-sky-400/#38bdf8)
-    - 负面/激烈 -> 紫色、黄色、红色系 (bg-purple-500/#a855f7, bg-amber-500/#f59e0b, bg-rose-500/#f43f5e)
-    - 中性/平淡 -> 灰色、蓝灰色系 (bg-slate-500/#64748b, bg-gray-400/#9ca3af)
-
-    评分规则（能量电池系统）:
+    【重要】评分规则（能量电池系统）:
     - +8 ~ +10: 极度开心、狂喜
     - +3 ~ +7: 愉快、满足、顺利
     - +1 ~ +2: 平静、安稳
     - -1 ~ -3: 轻微不适、小烦恼
     - -4 ~ -6: 疲惫、焦虑、反刍
     - -7 ~ -10: 难过、愤怒、严重内耗
+
+    【关键要求】
+    - 负面情绪（如：崩溃、难过、焦虑、愤怒、疲惫）必须返回负数，范围 -5 到 -10
+    - 正面情绪（如：开心、满足、兴奋）必须返回正数，范围 +5 到 +10
+    - "崩溃"属于严重负面情绪，分数应该是 -8 到 -10 之间
+
+    颜色规则:
+    - 正面/平静 -> 绿色、青色、蓝绿色系 (bg-emerald-500/#10b981, bg-teal-500/#14b8a6, bg-sky-400/#38bdf8)
+    - 负面/激烈 -> 紫色、黄色、红色系 (bg-purple-500/#a855f7, bg-amber-500/#f59e0b, bg-rose-500/#f43f5e)
+    - 中性/平淡 -> 灰色、蓝灰色系 (bg-slate-500/#64748b, bg-gray-400/#9ca3af)
   `;
 
   try {
@@ -179,7 +198,7 @@ export const generateMoodMetadata = async (moodLabel: string): Promise<Partial<M
     if (CURRENT_PROVIDER === 'DEEPSEEK') {
       console.log("Using DeepSeek for Metadata...");
       jsonString = await callDeepSeek(
-        "你是一个辅助生成 UI 样式的 JSON 生成器。",
+        "你是一个辅助生成 UI 样式的 JSON 生成器。请严格按照评分规则返回正确的分数。",
         promptText
       );
     } else {
@@ -188,8 +207,27 @@ export const generateMoodMetadata = async (moodLabel: string): Promise<Partial<M
     }
 
     const result = JSON.parse(cleanJsonString(jsonString));
-    // 确保分数在 -10 到 +10 范围内
-    const score = Math.max(-10, Math.min(10, result.score ?? 0));
+    console.log(`[MoodMetadata] DeepSeek 原始返回:`, result);
+    let score = Math.max(-10, Math.min(10, result.score ?? 0));
+    console.log(`[MoodMetadata] 解析后分数: ${score}`);
+    
+    // 校正：根据关键词修正 AI 可能产生的错误分数
+    const expectedSign = getExpectedScoreSign(moodLabel);
+    if (expectedSign !== null) {
+      if (expectedSign < 0 && score > 0) {
+        // 应该是负数但却是正数，取反并加强负面程度
+        score = -Math.abs(score) - 3;
+        console.log(`[MoodMetadata] 校正分数: ${moodLabel} ${result.score} -> ${score} (负面情绪应为负值)`);
+      } else if (expectedSign > 0 && score < 0) {
+        // 应该是正数但却是负数，取反
+        score = Math.abs(score);
+        console.log(`[MoodMetadata] 校正分数: ${moodLabel} ${result.score} -> ${score} (正面情绪应为正值)`);
+      }
+    }
+    
+    // 确保在范围内
+    score = Math.max(-10, Math.min(10, score));
+    
     return {
       emoji: result.emoji || '🏷️',
       color: result.color || 'bg-slate-400',
@@ -202,7 +240,7 @@ export const generateMoodMetadata = async (moodLabel: string): Promise<Partial<M
       emoji: '🏷️',
       color: 'bg-slate-400',
       hexColor: '#94a3b8',
-      score: 5
+      score: 0  // V2 系统默认 0，V1 遗留是 5
     };
   }
 };
@@ -257,6 +295,7 @@ export const evaluateMoodScore = async (mood: string, content: string, presetSco
     const minAllowed = Math.max(-10, presetScore - 2);
     const maxAllowed = Math.min(10, presetScore + 2);
     const score = Math.max(minAllowed, Math.min(maxAllowed, rawScore));
+    console.log(`[evaluateMoodScore] 心情:${mood}, 预设:${presetScore}, AI返回:${result.score}, 范围:[${minAllowed},${maxAllowed}], 最终:${score}`);
     return score;
   } catch (error) {
     console.error(`Energy evaluation failed (${CURRENT_PROVIDER}):`, error);
@@ -338,7 +377,7 @@ export const generateRegulationSuggestions = async (
     用户刚刚写了一篇负面情绪的心情日记：
 
     心情标签: ${mood}
-    情绪评分: ${moodScore}分（满分10分）
+    情绪能量值: ${moodScore}分（-10到+10分，负数=消耗能量，正数=恢复能量）
     日记内容: ${content}
 
     请根据用户的具体情绪和日记内容，以${mentorConfig.name}的风格，给出2-3条针对性的行动建议。
@@ -381,20 +420,20 @@ export const generateAiReply = async (
 ): Promise<string> => {
   const mentorConfig = MENTORS[mentor];
   
-  // 判断是否需要鸡汤（评分 ≤ 5）
-  const needsEncouragement = moodScore !== undefined && moodScore <= 5;
+  // 判断是否需要鼓励（V2 系统：负数或 ≤ -3 认为是负面情绪）
+  const needsEncouragement = moodScore !== undefined && moodScore < 0;
 
   const promptText = `
     用户刚刚写了一篇心情日记：
 
     心情标签: ${mood}
     日记内容: ${content}
-    ${moodScore !== undefined ? `情绪评分: ${moodScore}分（满分10分）` : ''}
+    ${moodScore !== undefined ? `情绪能量值: ${moodScore}分（-10到+10，负数=负面情绪）` : ''}
 
     请用一句温暖、真诚的话回应用户。
     
     ${needsEncouragement ? `
-    【重要】用户情绪低落（评分≤5），请在回复最后另起一行，加上一句简短有力的金句：
+    【重要】用户情绪低落（能量值为负数），请在回复最后另起一行，加上一句简短有力的金句：
        - 要与日记内容相关，针对用户的具体困境
        - 15-25个字，有力量感，能给人希望
        - 用「」符号包裹，如：「黑夜之后，总有黎明」
@@ -451,7 +490,7 @@ export interface WeeklyReport {
 export interface TriggerFactor {
   category: string;      // 事件类型（如：工作、社交、家庭）
   count: number;         // 出现次数
-  avgScore: number;      // 平均情绪分数
+  avgScore: number;      // 平均情绪能量值（-10到+10）
   trend: 'positive' | 'neutral' | 'negative';  // 情绪倾向
 }
 
@@ -517,7 +556,8 @@ export const generateWeeklyReport = async (
 
     timeAnalysis[period].count++;
     timeAnalysis[period].scores.push(entry.moodScore);
-    if (entry.moodScore <= 5) {
+    // V2 系统：负数才是负面情绪（不是 <= 5）
+    if (entry.moodScore < 0 || entry.energyDelta !== undefined && entry.energyDelta < 0) {
       timeAnalysis[period].negativeMoods.push(entry.mood);
     }
   });
@@ -543,7 +583,7 @@ export const generateWeeklyReport = async (
 
     请分析用户的情绪周报，重点关注：
     1. 为每一天生成一个字或词（不超过3个字）+ 一个 emoji 来总结这天的状态
-    2. 负面情绪（评分≤5）在哪些时间段更容易出现？
+    2. 负面情绪（能量值为负数）在哪些时间段更容易出现？
     3. 针对这些高发时段给出具体可执行的建议
 
     返回 JSON 格式：
@@ -661,10 +701,10 @@ export const generateDailyDeepReflection = async (
 你是一位精准的情绪模式识别专家。你擅长从碎片化的心情记录中发现用户的情绪波动规律、时间分布特征，以及背后的触发因素。
 
 # Input Context
-用户今天记录了 ${sortedEntries.length} 次心情，包含时间、情绪标签、评分、持续时间和简短记录。
+用户今天记录了 ${sortedEntries.length} 次心情，包含时间、情绪标签、能量值（-10到+10，负数=负面情绪）、持续时间和简短记录。
 
 # Analysis Focus
-1. **情绪黑洞**：重点关注持续时间超过1小时的负面情绪（评分≤5），这些是最消耗能量的"黑洞"
+1. **情绪黑洞**：重点关注持续时间超过1小时的负面情绪（能量值为负数），这些是最消耗能量的"黑洞"
 2. **时间规律**：情绪波动在什么时间段最明显？
 3. **触发因素**：哪些事件或场景反复触发情绪波动？
 4. **重复模式**：是否存在同一个问题反复出现的情况？

@@ -140,7 +140,8 @@ function aggregateWeekData(entries: DiaryEntry[], targetWeekKey?: string): WeekS
     return sum + (mins || 30); // 默认30分钟
   }, 0);
   
-  const avgEnergyDelta = entries.reduce((sum, e) => sum + (e.energyDelta || e.moodScore / 2), 0) / totalEntries;
+  // V2 系统：直接使用 energyDelta 或 moodScore（不再除以2，因为 V2 分数已经是 -10 到 +10）
+  const avgEnergyDelta = entries.reduce((sum, e) => sum + (e.energyDelta ?? e.moodScore ?? 0), 0) / totalEntries;
   
   // 主导情绪（按时长）
   const moodMinutes: Record<string, number> = {};
@@ -176,7 +177,7 @@ function aggregateWeekData(entries: DiaryEntry[], targetWeekKey?: string): WeekS
     });
     
     const avgEnergy = dayEntries.length > 0
-      ? dayEntries.reduce((sum, e) => sum + (e.energyDelta || e.moodScore / 2), 0) / dayEntries.length
+      ? dayEntries.reduce((sum, e) => sum + (e.energyDelta ?? e.moodScore ?? 0), 0) / dayEntries.length
       : 0;
     
     dailyStats.push({

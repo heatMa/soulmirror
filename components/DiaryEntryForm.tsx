@@ -11,6 +11,7 @@ interface Props {
   onSave: (entry: Omit<DiaryEntry, 'id' | 'timestamp'> & { id?: string, timestamp?: number }) => void;
   onClose: () => void;
   customMoods?: MoodOption[]; // 从父组件传入的自定义心情
+  onCustomMoodsChange?: (moods: MoodOption[]) => void; // 自定义心情变化时的回调
 }
 
 // 富文本颜色选项
@@ -24,7 +25,7 @@ const TEXT_COLORS = [
   { value: '#8b5cf6', label: '紫色', borderClass: 'border-violet-500' },
 ];
 
-const DiaryEntryForm: React.FC<Props> = ({ initialData, onSave, onClose, customMoods: propCustomMoods }) => {
+const DiaryEntryForm: React.FC<Props> = ({ initialData, onSave, onClose, customMoods: propCustomMoods, onCustomMoodsChange }) => {
   const [selectedMood, setSelectedMood] = useState<MoodOption>(MOOD_OPTIONS[2]);
   const [internalCustomMoods, setInternalCustomMoods] = useState<MoodOption[]>([]);
   
@@ -133,6 +134,8 @@ const DiaryEntryForm: React.FC<Props> = ({ initialData, onSave, onClose, customM
       await databaseService.saveCustomMood(newMood);
       const updated = [...customMoods, newMood];
       setInternalCustomMoods(updated);
+      // 通知父组件更新状态，确保 UI 立即刷新
+      onCustomMoodsChange?.(updated);
     } catch (e) {
       console.error("Failed to save custom mood", e);
     }
@@ -146,6 +149,8 @@ const DiaryEntryForm: React.FC<Props> = ({ initialData, onSave, onClose, customM
       await databaseService.deleteCustomMood(label);
       const updated = customMoods.filter(m => m.label !== label);
       setInternalCustomMoods(updated);
+      // 通知父组件更新状态，确保 UI 立即刷新
+      onCustomMoodsChange?.(updated);
       // 如果当前选中的是被删除的心情，切换到默认心情
       if (selectedMood.label === label) {
         setSelectedMood(MOOD_OPTIONS[0]);
@@ -163,10 +168,26 @@ const DiaryEntryForm: React.FC<Props> = ({ initialData, onSave, onClose, customM
     setIsGeneratingTag(true);
     try {
       const metadata = await generateMoodMetadata(trimmed);
+      // 确保 score 是有效的数字，且使用 V2 系统（-10 到 +10）
+      let score = metadata.score ?? 0;
+      // 如果 AI 返回了 V1 范围的正值（1-10）用于负面情绪，强制转换为负值
+      if (score > 0 && score <= 10) {
+        // 检查是否应该是负面情绪（简单启发式：如果元数据显示负面颜色）
+        const isNegativeColor = metadata.color?.includes('rose') || 
+                               metadata.color?.includes('red') || 
+                               metadata.color?.includes('purple') ||
+                               metadata.color?.includes('amber') ||
+                               metadata.color?.includes('orange');
+        if (isNegativeColor) {
+          console.warn(`[DiaryEntryForm] 检测到负面情绪 "${trimmed}" 使用了正分 ${score}，强制转换为负值`);
+          score = -Math.abs(score);
+        }
+      }
+      
       const newMoodOption: MoodOption = {
         label: trimmed,
         value: trimmed,
-        score: metadata.score || 5,
+        score: score,
         emoji: metadata.emoji || '🏷️',
         color: metadata.color || 'bg-slate-400',
         hexColor: metadata.hexColor || '#94a3b8',

@@ -234,9 +234,9 @@ const App: React.FC = () => {
         setEntries(prev => prev.map(e => e.id === updatedEntry.id ? updatedEntry : e));
 
         // AI 重新评分（能量系统）
-        // 从 mood 配置中获取正确的预设分数，避免使用旧版系统的错误分数
-        const moodConfig = getMoodConfig(updatedEntry.mood);
-        const presetScore = moodConfig.score;
+        // 使用表单传递的 moodScore（确保自定义心情使用正确的分数）
+        const presetScore = formData.moodScore ?? 0;
+        console.log(`[handleSaveEntry/编辑] 使用预设分数: ${presetScore}, 心情: ${updatedEntry.mood}`);
         evaluateMoodScore(updatedEntry.mood, updatedEntry.content, presetScore)
           .then(async (aiScore) => {
             if (aiScore !== undefined) {
@@ -301,16 +301,16 @@ const App: React.FC = () => {
           timestamp = targetTime.getTime();
         }
 
-        // 从 mood 配置中获取正确的预设分数
-        const moodConfig = getMoodConfig(formData.mood);
-        const initialScore = moodConfig.score;
+        // 使用表单传递的 moodScore（对于自定义心情，这是 AI 生成的正确分数）
+        const presetScore = formData.moodScore ?? 0;
+        console.log(`[handleSaveEntry] 使用预设分数: ${presetScore}, 心情: ${formData.mood}`);
 
         const entryData = {
           timestamp,
           content: formData.content,
           mood: formData.mood,
-          moodScore: initialScore, // 使用 mood 配置的预设分数
-          energyDelta: initialScore, // 初始使用预设分数，会被 AI 更新
+          moodScore: presetScore,
+          energyDelta: presetScore,
           scoreVersion: 'v2' as const,
           moodEmoji: formData.moodEmoji,
           moodHexColor: formData.moodHexColor,
@@ -324,8 +324,7 @@ const App: React.FC = () => {
         setEntries(prev => [newEntry, ...prev]);
 
         // AI 后台评分（能量系统）
-        // 使用已获取的 moodConfig 中的预设分数
-        const presetScore = initialScore;
+        // 使用表单传递的预设分数
         evaluateMoodScore(newEntry.mood, newEntry.content, presetScore)
           .then(async (aiScore) => {
             if (aiScore !== undefined) {
@@ -459,11 +458,15 @@ const App: React.FC = () => {
       return found;
     }
 
-    // 找不到配置时，使用 entry 自带的数据（emoji 和 hexColor）
+    // 找不到配置时（可能是新自定义心情或数据未同步），使用 entry 自带的数据或默认 0
+    const fallbackScore = entry?.moodScore ?? 0;
+    if (fallbackScore === 0) {
+      console.warn(`[getMoodConfig] 未找到心情配置: "${moodLabel}"，使用默认分数 0，customMoods 数量: ${customMoods.length}`);
+    }
     return {
       label: moodLabel,
       value: moodLabel,
-      score: entry?.moodScore || 5,
+      score: fallbackScore, // V2 系统默认 0（中性），V1 遗留是 5
       emoji: entry?.moodEmoji || '🏷️',
       color: 'bg-gray-400',
       hexColor: entry?.moodHexColor || '#9ca3af',
@@ -550,7 +553,8 @@ const App: React.FC = () => {
         const entriesText = timelineEntries
           .map(entry => {
             const time = new Date(entry.timestamp).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
-            return `⏰ ${time} | ${entry.mood} ${entry.moodScore > 0 ? `(${entry.moodScore.toFixed(1)}分)` : ''}\n${entry.content}`;
+            const scoreText = entry.energyDelta !== undefined ? `(${entry.energyDelta >= 0 ? '+' : ''}${entry.energyDelta}分)` : '';
+            return `⏰ ${time} | ${entry.mood} ${scoreText}\n${entry.content}`;
           })
           .join('\n\n------------------\n\n');
         summaryText += `💫 心情记录：\n${entriesText}`;
@@ -833,6 +837,7 @@ const App: React.FC = () => {
           onSave={handleSaveEntry} 
           onClose={() => setShowAddForm(false)} 
           customMoods={effectiveCustomMoods}
+          onCustomMoodsChange={setCustomMoods}
         />
       )}
       

@@ -3,7 +3,7 @@ export interface DiaryEntry {
   id: string;
   timestamp: number;
   mood: string;
-  moodScore: number; // 1-10 (v1旧系统) 或 -10到+10 (v2新系统)
+  moodScore: number; // -10到+10 (能量电池系统)
   moodEmoji?: string; // 心情表情，用于删除心情配置后仍能正确显示
   moodHexColor?: string; // 心情主题色，用于删除心情配置后仍能正确显示
   content: string;
@@ -14,7 +14,7 @@ export interface DiaryEntry {
   duration?: number; // 手动填写的持续时长（分钟，可选）
   isActive?: boolean; // 是否进行中（未结束）
   energyDelta?: number; // 本条记录的能量变化值（-10到+10，新能量系统）
-  scoreVersion?: 'v1' | 'v2'; // v1=旧1-10分系统，v2=新能量电池系统
+  // scoreVersion 已废弃，保留字段仅用于兼容旧数据，新代码不再使用
 }
 
 export interface AIAnalysis {

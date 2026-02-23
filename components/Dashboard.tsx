@@ -134,7 +134,7 @@ const Dashboard: React.FC<Props> = ({ entries, onDataRestored, customMoods: prop
     const header = `美好时光 心情日记导出 - ${label}\n生成时间: ${now.toLocaleString()}\n====================================\n\n`;
     const body = dataToExport.map(e => {
       const time = new Date(e.timestamp).toLocaleString();
-      return `[${time}] ${e.mood} (评分: ${e.moodScore.toFixed(1)})\n内容: ${e.content}\n------------------------------------`;
+      return `[${time}] ${e.mood} (能量值: ${e.moodScore.toFixed(1)})\n内容: ${e.content}\n------------------------------------`;
     }).join('\n\n');
 
     const content = header + body;

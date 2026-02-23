@@ -317,12 +317,12 @@ const MoodHistory: React.FC<Props> = ({ entries, allMoods, selectedMood, timeRan
                       {entry.mood}
                     </span>
                     <span className="text-xs text-gray-400">{time}</span>
-                    {entry.moodScore > 0 && (
+                    {entry.energyDelta !== undefined && (
                       <span
                         className="text-xs font-medium ml-auto"
-                        style={{ color: hexColor }}
+                        style={{ color: entry.energyDelta >= 0 ? '#10b981' : '#f43f5e' }}
                       >
-                        {entry.moodScore.toFixed(1)}分
+                        {entry.energyDelta >= 0 ? '+' : ''}{entry.energyDelta}分
                       </span>
                     )}
                   </div>
@@ -393,12 +393,12 @@ const MoodHistory: React.FC<Props> = ({ entries, allMoods, selectedMood, timeRan
                               {entry.mood}
                             </span>
                             <span className="text-xs text-gray-400">{time}</span>
-                            {entry.moodScore > 0 && (
+                            {entry.energyDelta !== undefined && (
                               <span
                                 className="text-xs font-medium ml-auto"
-                                style={{ color: hexColor }}
+                                style={{ color: entry.energyDelta >= 0 ? '#10b981' : '#f43f5e' }}
                               >
-                                {entry.moodScore.toFixed(1)}分
+                                {entry.energyDelta >= 0 ? '+' : ''}{entry.energyDelta}分
                               </span>
                             )}
                           </div>
