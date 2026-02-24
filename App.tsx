@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { App as CapacitorApp } from '@capacitor/app';
-import { DiaryEntry, ViewMode, WeeklyReport, MentorType, UserSettings } from './types';
+import { DiaryEntry, EntryComment, ViewMode, WeeklyReport, MentorType, UserSettings } from './types';
 import DiaryEntryForm from './components/DiaryEntryForm';
 import Dashboard from './components/Dashboard';
 import CalendarStrip from './components/CalendarStrip';
@@ -14,6 +14,7 @@ import Statistics from './components/Statistics';
 import WeeklyReportCard from './components/WeeklyReportCard';
 import WeeklyReportView from './components/WeeklyReportView';
 import WeeklyReportPreview from './components/WeeklyReportPreview';
+import EntryCommentSheet from './components/EntryCommentSheet';
 import { ICONS, MOOD_OPTIONS, MoodOption, getEffectiveCustomMoods, DEFAULT_MENTOR } from './constants';
 import { evaluateMoodScore, generateAiReply, generateRegulationSuggestions } from './services/geminiService';
 import { databaseService } from './services/databaseService';
@@ -52,6 +53,11 @@ const App: React.FC = () => {
 
   // 导师系统状态
   const [selectedMentor, setSelectedMentor] = useState<MentorType>(DEFAULT_MENTOR);
+
+  // 进展评论系统状态
+  const [commentSheetEntry, setCommentSheetEntry] = useState<DiaryEntry | null>(null);
+  const [commentSheetData, setCommentSheetData] = useState<EntryComment[]>([]);
+  const [entryCommentCounts, setEntryCommentCounts] = useState<Record<string, number>>({});
 
   // 初始化数据库并加载数据
   useEffect(() => {
@@ -155,6 +161,13 @@ const App: React.FC = () => {
     if (!isNative) return;
 
     const backButtonListener = CapacitorApp.addListener('backButton', ({ canGoBack }) => {
+      // 优先级0：如果进展评论底部弹出层打开，关闭它
+      if (commentSheetEntry) {
+        setCommentSheetEntry(null);
+        setCommentSheetData([]);
+        return;
+      }
+
       // 优先级1：如果周报详情页打开，关闭它
       if (showReportView) {
         setShowReportView(false);
@@ -180,7 +193,7 @@ const App: React.FC = () => {
     return () => {
       backButtonListener.remove();
     };
-  }, [showReportView, viewMode]);
+  }, [showReportView, viewMode, commentSheetEntry]);
 
   // 根据选中的日期加载对应周的周报
   useEffect(() => {
@@ -208,6 +221,37 @@ const App: React.FC = () => {
 
     loadWeeklyReportForDate();
   }, [selectedDate, isLoading]);
+
+  // 加载进展评论数量（批量，针对当前显示的条目）
+  const loadCommentCounts = useCallback(async (entryList: DiaryEntry[]) => {
+    if (entryList.length === 0) return;
+    try {
+      const counts: Record<string, number> = {};
+      await Promise.all(
+        entryList.map(async (e) => {
+          const comments = await databaseService.getCommentsByEntryId(e.id);
+          counts[e.id] = comments.length;
+        })
+      );
+      setEntryCommentCounts(prev => ({ ...prev, ...counts }));
+    } catch (error) {
+      console.error('加载评论数量失败:', error);
+    }
+  }, []);
+
+  // 加载时间线条目的评论数量
+  useEffect(() => {
+    if (isLoading) return;
+    const visibleEntries = entries.filter(entry => {
+      const entryDate = new Date(entry.timestamp);
+      return entryDate.getDate() === selectedDate.getDate() &&
+             entryDate.getMonth() === selectedDate.getMonth() &&
+             entryDate.getFullYear() === selectedDate.getFullYear();
+    });
+    if (visibleEntries.length > 0) {
+      loadCommentCounts(visibleEntries);
+    }
+  }, [entries, selectedDate, isLoading, loadCommentCounts]);
 
   // 保存日记条目
   const handleSaveEntry = useCallback(async (formData: Omit<DiaryEntry, 'id' | 'timestamp'> & { id?: string, timestamp?: number, entryHours?: number, entryMinutes?: number }) => {
@@ -429,6 +473,57 @@ const App: React.FC = () => {
       alert('操作失败，请重试');
     }
   }, []);
+
+  // 打开进展评论底部弹出层
+  const handleOpenCommentSheet = useCallback(async (entry: DiaryEntry) => {
+    try {
+      const comments = await databaseService.getCommentsByEntryId(entry.id);
+      setCommentSheetData(comments);
+      setCommentSheetEntry(entry);
+    } catch (error) {
+      console.error('加载评论失败:', error);
+    }
+  }, []);
+
+  // 添加评论
+  const handleAddComment = useCallback(async (content: string) => {
+    if (!commentSheetEntry) return;
+    try {
+      await databaseService.addComment(commentSheetEntry.id, content);
+      const comments = await databaseService.getCommentsByEntryId(commentSheetEntry.id);
+      setCommentSheetData(comments);
+      setEntryCommentCounts(prev => ({ ...prev, [commentSheetEntry.id]: comments.length }));
+    } catch (error) {
+      console.error('添加评论失败:', error);
+    }
+  }, [commentSheetEntry]);
+
+  // 删除评论
+  const handleDeleteComment = useCallback(async (commentId: number) => {
+    if (!commentSheetEntry) return;
+    try {
+      await databaseService.deleteComment(commentId);
+      const comments = await databaseService.getCommentsByEntryId(commentSheetEntry.id);
+      setCommentSheetData(comments);
+      setEntryCommentCounts(prev => ({ ...prev, [commentSheetEntry.id]: comments.length }));
+    } catch (error) {
+      console.error('删除评论失败:', error);
+    }
+  }, [commentSheetEntry]);
+
+  // 切换已好转状态
+  const handleToggleResolved = useCallback(async () => {
+    if (!commentSheetEntry) return;
+    try {
+      const newResolvedAt = commentSheetEntry.resolved_at ? null : new Date().toISOString();
+      await databaseService.updateEntryResolved(commentSheetEntry.id, newResolvedAt);
+      const updatedEntry: DiaryEntry = { ...commentSheetEntry, resolved_at: newResolvedAt };
+      setCommentSheetEntry(updatedEntry);
+      setEntries(prev => prev.map(e => e.id === updatedEntry.id ? updatedEntry : e));
+    } catch (error) {
+      console.error('更新已好转状态失败:', error);
+    }
+  }, [commentSheetEntry]);
 
   // 保存每日笔记
   const saveDailyNote = useCallback(async (dateStr: string, content: string) => {
@@ -848,6 +943,9 @@ const App: React.FC = () => {
                         countWeek={countWeek}
                         countMonth={countMonth}
                         energyRemaining={energyRemaining}
+                        commentCount={entryCommentCounts[entry.id] || 0}
+                        resolvedAt={entry.resolved_at}
+                        onBadgeClick={() => handleOpenCommentSheet(entry)}
                     />
                   );
                 })}
@@ -934,7 +1032,7 @@ const App: React.FC = () => {
       
       {/* 周报详情页 */}
       {showReportView && currentWeekReport && (
-        <WeeklyReportView 
+        <WeeklyReportView
           report={currentWeekReport}
           onClose={() => setShowReportView(false)}
           onExperimentAccept={() => {
@@ -947,6 +1045,21 @@ const App: React.FC = () => {
               }
             } : null);
           }}
+        />
+      )}
+
+      {/* 进展评论底部弹出层 */}
+      {commentSheetEntry && (
+        <EntryCommentSheet
+          entry={commentSheetEntry}
+          comments={commentSheetData}
+          onClose={() => {
+            setCommentSheetEntry(null);
+            setCommentSheetData([]);
+          }}
+          onAddComment={handleAddComment}
+          onDeleteComment={handleDeleteComment}
+          onToggleResolved={handleToggleResolved}
         />
       )}
     </div>

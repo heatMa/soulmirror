@@ -1,6 +1,6 @@
 import { CapacitorSQLite, SQLiteConnection, SQLiteDBConnection } from '@capacitor-community/sqlite';
 import { Capacitor } from '@capacitor/core';
-import { DiaryEntry, BackupData, ImportResult, WeeklySummary, WeeklyReport, UserSettings, MentorType } from '../types';
+import { DiaryEntry, EntryComment, BackupData, ImportResult, WeeklySummary, WeeklyReport, UserSettings, MentorType } from '../types';
 import { MoodOption, DEFAULT_MENTOR } from '../constants';
 
 // 数据库名称和版本
@@ -64,7 +64,15 @@ CREATE TABLE IF NOT EXISTS weekly_summaries (
   created_at INTEGER NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS entry_comments (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  entry_id TEXT NOT NULL,
+  content TEXT NOT NULL,
+  created_at TEXT NOT NULL
+);
+
 CREATE INDEX IF NOT EXISTS idx_entries_timestamp ON diary_entries(timestamp);
+CREATE INDEX IF NOT EXISTS idx_comments_entry_id ON entry_comments(entry_id);
 `;
 
 /**
@@ -107,6 +115,20 @@ class DatabaseService {
     throw new Error('Method not implemented');
   }
   deleteWeeklyReport(weekKey: string): Promise<void> {
+    throw new Error('Method not implemented');
+  }
+
+  // ==================== 进展评论系统方法声明 ====================
+  getCommentsByEntryId(entryId: string): Promise<EntryComment[]> {
+    throw new Error('Method not implemented');
+  }
+  addComment(entryId: string, content: string): Promise<EntryComment> {
+    throw new Error('Method not implemented');
+  }
+  deleteComment(commentId: number): Promise<void> {
+    throw new Error('Method not implemented');
+  }
+  updateEntryResolved(entryId: string, resolvedAt: string | null): Promise<void> {
     throw new Error('Method not implemented');
   }
 
@@ -257,6 +279,31 @@ class DatabaseService {
         await this.db.execute("ALTER TABLE diary_entries ADD COLUMN score_version TEXT DEFAULT 'v1'");
         console.log('数据库迁移：添加 score_version 列（旧数据默认 v1）');
       }
+
+      // 迁移：添加 resolved_at 列（情绪已好转时间）
+      const hasResolvedAt = entriesColumns.some((col: any) => col.name === 'resolved_at');
+      if (!hasResolvedAt) {
+        try {
+          await this.db.execute('ALTER TABLE diary_entries ADD COLUMN resolved_at TEXT');
+          console.log('数据库迁移：添加 resolved_at 列');
+        } catch (e) {
+          // 列已存在时忽略错误
+        }
+      }
+
+      // 确保 entry_comments 表存在
+      await this.db.execute(`
+        CREATE TABLE IF NOT EXISTS entry_comments (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          entry_id TEXT NOT NULL,
+          content TEXT NOT NULL,
+          created_at TEXT NOT NULL
+        )
+      `);
+      await this.db.execute(`
+        CREATE INDEX IF NOT EXISTS idx_comments_entry_id ON entry_comments(entry_id)
+      `).catch(() => {/* 索引已存在时忽略 */});
+
     } catch (error) {
       console.error('数据库迁移失败:', error);
     }
@@ -362,7 +409,8 @@ class DatabaseService {
       const entries = await this.getAllEntries();
       const index = entries.findIndex(e => e.id === entry.id);
       if (index !== -1) {
-        entries[index] = entry;
+        // Merge to preserve fields not included in this update (e.g., resolved_at)
+        entries[index] = { ...entries[index], ...entry };
         localStorage.setItem(STORAGE_KEYS.ENTRIES, JSON.stringify(entries));
       }
     }
@@ -429,11 +477,18 @@ class DatabaseService {
     await this.ensureInitialized();
 
     if (this.isNative && this.db) {
+      await this.db.run('DELETE FROM entry_comments WHERE entry_id = ?', [id]);
       await this.db.run('DELETE FROM diary_entries WHERE id = ?', [id]);
     } else {
       const entries = await this.getAllEntries();
       const filtered = entries.filter(e => e.id !== id);
       localStorage.setItem(STORAGE_KEYS.ENTRIES, JSON.stringify(filtered));
+
+      const commentData = localStorage.getItem('soulmirror_entry_comments');
+      if (commentData) {
+        const comments: EntryComment[] = JSON.parse(commentData);
+        localStorage.setItem('soulmirror_entry_comments', JSON.stringify(comments.filter(c => c.entry_id !== id)));
+      }
     }
   }
 
@@ -456,7 +511,8 @@ class DatabaseService {
       duration: row.duration as number | undefined,
       isActive: Boolean(row.is_active),
       energyDelta: row.energy_delta as number | undefined,
-      scoreVersion: ((row.score_version as string) || 'v1') as 'v1' | 'v2'
+      scoreVersion: ((row.score_version as string) || 'v1') as 'v1' | 'v2',
+      resolved_at: (row.resolved_at as string | null | undefined) ?? null
     };
   }
 
@@ -1339,6 +1395,94 @@ DatabaseService.prototype.deleteWeeklyReport = async function(weekKey: string): 
     const reports: Record<string, WeeklyReport> = data ? JSON.parse(data) : {};
     delete reports[weekKey];
     localStorage.setItem(WEEKLY_REPORTS_KEY, JSON.stringify(reports));
+  }
+};
+
+// ==================== 进展评论系统操作 ====================
+const ENTRY_COMMENTS_KEY = 'soulmirror_entry_comments';
+
+// 获取某条目的所有评论
+DatabaseService.prototype.getCommentsByEntryId = async function(entryId: string): Promise<EntryComment[]> {
+  await this.ensureInitialized();
+
+  if (this.isNative && this.db) {
+    const result = await this.db.query(
+      'SELECT * FROM entry_comments WHERE entry_id = ? ORDER BY created_at ASC',
+      [entryId]
+    );
+    return (result.values || []).map((row: any) => ({
+      id: row.id as number,
+      entry_id: row.entry_id as string,
+      content: row.content as string,
+      created_at: row.created_at as string
+    }));
+  } else {
+    const data = localStorage.getItem(ENTRY_COMMENTS_KEY);
+    const comments: EntryComment[] = data ? JSON.parse(data) : [];
+    return comments
+      .filter(c => c.entry_id === entryId)
+      .sort((a, b) => a.created_at.localeCompare(b.created_at));
+  }
+};
+
+// 添加评论
+DatabaseService.prototype.addComment = async function(entryId: string, content: string): Promise<EntryComment> {
+  await this.ensureInitialized();
+  const createdAt = new Date().toISOString();
+
+  if (this.isNative && this.db) {
+    const result = await this.db.run(
+      'INSERT INTO entry_comments (entry_id, content, created_at) VALUES (?, ?, ?)',
+      [entryId, content, createdAt]
+    );
+    const newId = result.changes?.lastId ?? Date.now();
+    return { id: newId as number, entry_id: entryId, content, created_at: createdAt };
+  } else {
+    const data = localStorage.getItem(ENTRY_COMMENTS_KEY);
+    const comments: EntryComment[] = data ? JSON.parse(data) : [];
+    const newComment: EntryComment = {
+      id: Date.now(),
+      entry_id: entryId,
+      content,
+      created_at: createdAt
+    };
+    comments.push(newComment);
+    localStorage.setItem(ENTRY_COMMENTS_KEY, JSON.stringify(comments));
+    return newComment;
+  }
+};
+
+// 删除评论
+DatabaseService.prototype.deleteComment = async function(commentId: number): Promise<void> {
+  await this.ensureInitialized();
+
+  if (this.isNative && this.db) {
+    await this.db.run('DELETE FROM entry_comments WHERE id = ?', [commentId]);
+  } else {
+    const data = localStorage.getItem(ENTRY_COMMENTS_KEY);
+    const comments: EntryComment[] = data ? JSON.parse(data) : [];
+    const filtered = comments.filter(c => c.id !== commentId);
+    localStorage.setItem(ENTRY_COMMENTS_KEY, JSON.stringify(filtered));
+  }
+};
+
+// 更新条目的已好转状态
+DatabaseService.prototype.updateEntryResolved = async function(entryId: string, resolvedAt: string | null): Promise<void> {
+  await this.ensureInitialized();
+
+  if (this.isNative && this.db) {
+    await this.db.run(
+      'UPDATE diary_entries SET resolved_at = ? WHERE id = ?',
+      [resolvedAt, entryId]
+    );
+  } else {
+    const data = localStorage.getItem(STORAGE_KEYS.ENTRIES);
+    const entries: DiaryEntry[] = data ? JSON.parse(data) : [];
+    const index = entries.findIndex(e => e.id === entryId);
+    if (index !== -1) {
+      entries[index] = { ...entries[index], resolved_at: resolvedAt };
+      localStorage.setItem(STORAGE_KEYS.ENTRIES, JSON.stringify(entries));
+    }
   }
 };
 

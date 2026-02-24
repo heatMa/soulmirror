@@ -18,6 +18,14 @@ export interface DiaryEntry {
   // 表单提交时使用的时间字段（不入库）
   entryHours?: number;
   entryMinutes?: number;
+  resolved_at?: string | null; // 情绪已好转时间（ISO字符串），null 表示尚未好转
+}
+
+export interface EntryComment {
+  id: number;
+  entry_id: string;
+  content: string;
+  created_at: string;
 }
 
 export interface AIAnalysis {

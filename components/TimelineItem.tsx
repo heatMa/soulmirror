@@ -16,6 +16,9 @@ interface Props {
   countWeek: number;
   countMonth: number;
   energyRemaining?: number; // 该条记录后的剩余电量
+  commentCount?: number; // 进展评论数量
+  resolvedAt?: string | null; // 情绪已好转时间
+  onBadgeClick?: () => void; // 点击徽章时的回调
 }
 
 const TimelineItem: React.FC<Props> = ({
@@ -29,6 +32,9 @@ const TimelineItem: React.FC<Props> = ({
   countWeek,
   countMonth,
   energyRemaining,
+  commentCount = 0,
+  resolvedAt,
+  onBadgeClick,
 }) => {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [swipeOffset, setSwipeOffset] = useState(0);
@@ -272,6 +278,23 @@ const TimelineItem: React.FC<Props> = ({
                   结束
                 </button>
               )}
+              {/* 进展评论徽章 — 始终显示，确保用户可以追加进展 */}
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onBadgeClick?.();
+                }}
+                className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold transition-all active:scale-90 shadow-sm ${
+                  resolvedAt
+                    ? 'bg-emerald-500 text-white hover:bg-emerald-600'
+                    : commentCount > 0
+                    ? 'bg-gray-400 text-white hover:bg-gray-500'
+                    : 'bg-gray-200 text-gray-400 hover:bg-gray-300 dark:bg-gray-700 dark:text-gray-500 dark:hover:bg-gray-600'
+                }`}
+                title={resolvedAt ? '已好转，点击查看进展' : commentCount > 0 ? '查看进展记录' : '追加进展'}
+              >
+                {resolvedAt ? '✓' : commentCount > 0 ? (commentCount > 9 ? '9+' : commentCount) : '+'}
+              </button>
               <button
                 onClick={handleCopy}
                 className={`p-1.5 rounded-full transition-all ${
