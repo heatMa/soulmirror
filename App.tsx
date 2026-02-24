@@ -485,6 +485,53 @@ const App: React.FC = () => {
     })
     .sort((a, b) => b.timestamp - a.timestamp);
 
+  // 计算字数（去除HTML标签）
+  const calculateCharCount = (content: string) => {
+    return content.replace(/<[^>]*>/g, '').length;
+  };
+
+  // 计算今日字数统计
+  const todayCharCount = useMemo(() => {
+    return timelineEntries.reduce((sum, entry) => sum + calculateCharCount(entry.content), 0);
+  }, [timelineEntries]);
+
+  // 计算本周字数统计
+  const weekCharCount = useMemo(() => {
+    const getWeekStart = (date: Date) => {
+      const d = new Date(date);
+      const day = d.getDay();
+      const diff = d.getDate() - day + (day === 0 ? -6 : 1);
+      return new Date(d.setDate(diff));
+    };
+    const weekStart = getWeekStart(selectedDate);
+    weekStart.setHours(0, 0, 0, 0);
+    const weekEnd = new Date(weekStart);
+    weekEnd.setDate(weekEnd.getDate() + 7);
+
+    return entries
+      .filter(e => {
+        const eDate = new Date(e.timestamp);
+        return eDate >= weekStart && eDate < weekEnd;
+      })
+      .reduce((sum, entry) => sum + calculateCharCount(entry.content), 0);
+  }, [entries, selectedDate]);
+
+  // 计算本月字数统计
+  const monthCharCount = useMemo(() => {
+    return entries
+      .filter(e => {
+        const eDate = new Date(e.timestamp);
+        return eDate.getMonth() === selectedDate.getMonth() &&
+               eDate.getFullYear() === selectedDate.getFullYear();
+      })
+      .reduce((sum, entry) => sum + calculateCharCount(entry.content), 0);
+  }, [entries, selectedDate]);
+
+  // 计算总字数统计
+  const totalCharCount = useMemo(() => {
+    return entries.reduce((sum, entry) => sum + calculateCharCount(entry.content), 0);
+  }, [entries]);
+
   // 计算每条记录的频次统计（今天、本周、本月）- 只统计相同心情标签
   const getEntryCounts = (entry: DiaryEntry) => {
     const entryDate = new Date(entry.timestamp);
@@ -723,9 +770,36 @@ const App: React.FC = () => {
                <EnergyBattery entries={timelineEntries} allEntries={entries} customMoods={effectiveCustomMoods} />
             </div>
 
-            {/* 今日记录标题 */}
-            <div className="flex justify-between items-center mb-3 px-2">
-              <h3 className="text-lg font-bold text-gray-800">今日记录</h3>
+            {/* 今日记录标题和字数统计 */}
+            <div className="flex flex-col gap-3 mb-4 px-2">
+              <div className="flex justify-between items-center">
+                <h3 className="text-lg font-bold text-gray-800">今日记录</h3>
+                <span className="text-xs text-gray-500">{timelineEntries.length} 条</span>
+              </div>
+              
+              {/* 字数统计卡片 */}
+              <div className="grid grid-cols-4 gap-2">
+                <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl p-2 text-center">
+                  <div className="text-[10px] text-blue-600 font-medium">今日</div>
+                  <div className="text-sm font-bold text-blue-800">{todayCharCount.toLocaleString()}</div>
+                  <div className="text-[8px] text-blue-500">字</div>
+                </div>
+                <div className="bg-gradient-to-br from-emerald-50 to-emerald-100 rounded-xl p-2 text-center">
+                  <div className="text-[10px] text-emerald-600 font-medium">本周</div>
+                  <div className="text-sm font-bold text-emerald-800">{weekCharCount.toLocaleString()}</div>
+                  <div className="text-[8px] text-emerald-500">字</div>
+                </div>
+                <div className="bg-gradient-to-br from-violet-50 to-violet-100 rounded-xl p-2 text-center">
+                  <div className="text-[10px] text-violet-600 font-medium">本月</div>
+                  <div className="text-sm font-bold text-violet-800">{monthCharCount.toLocaleString()}</div>
+                  <div className="text-[8px] text-violet-500">字</div>
+                </div>
+                <div className="bg-gradient-to-br from-amber-50 to-amber-100 rounded-xl p-2 text-center">
+                  <div className="text-[10px] text-amber-600 font-medium">总共</div>
+                  <div className="text-sm font-bold text-amber-800">{totalCharCount.toLocaleString()}</div>
+                  <div className="text-[8px] text-amber-500">字</div>
+                </div>
+              </div>
             </div>
             
             {timelineEntries.length === 0 ? (
