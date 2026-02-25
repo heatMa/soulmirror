@@ -681,9 +681,9 @@ const App: React.FC = () => {
             entries={entries}
           />
           
-          <main className="flex-1 px-2 pt-4 pb-28 overflow-y-auto no-scrollbar">
+          <main className="flex-1 px-1 pt-4 pb-28 overflow-y-auto no-scrollbar">
             {/* Header Greeting & Actions */}
-            <div className="mb-6 mt-2 px-2 animate-in fade-in slide-in-from-bottom-4 duration-700 flex justify-between items-end">
+            <div className="mb-6 mt-2 px-1 animate-in fade-in slide-in-from-bottom-4 duration-700 flex justify-between items-end">
                <div>
                  <h2 className="text-2xl font-bold text-gray-800 tracking-tight">{greeting}</h2>
                  <p className="text-sm text-gray-500/80 mt-1 font-medium">今天感觉如何？</p>
@@ -788,7 +788,7 @@ const App: React.FC = () => {
             </div>
 
             {/* 今日记录标题和字数统计 */}
-            <div className="flex flex-col gap-3 mb-4 px-2">
+            <div className="flex flex-col gap-3 mb-4 px-1">
               <div className="flex justify-between items-center">
                 <h3 className="text-lg font-bold text-gray-800">今日记录</h3>
                 <span className="text-xs text-gray-500">{timelineEntries.length} 条</span>
@@ -826,7 +826,7 @@ const App: React.FC = () => {
                  </div>
               </div>
             ) : (
-              <div className="glass-card rounded-[32px] p-4 animate-in slide-in-from-bottom-8 duration-500 min-h-[200px]">
+              <div className="glass-card rounded-[32px] p-3 animate-in slide-in-from-bottom-8 duration-500 min-h-[200px]">
                 {timelineEntries.map((entry, index) => {
                   const moodConfig = getMoodConfig(entry.mood, entry);
                   const isLast = index === timelineEntries.length - 1;

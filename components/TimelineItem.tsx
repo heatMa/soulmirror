@@ -181,7 +181,7 @@ const TimelineItem: React.FC<Props> = ({
 
       {/* 主内容区域 */}
       <div
-        className="flex gap-4 relative bg-white transition-transform"
+        className="flex gap-3 relative bg-white transition-transform"
         style={{ transform: `translateX(-${swipeOffset}px)` }}
         onTouchStart={handleTouchStart}
         onTouchMove={handleTouchMove}
@@ -190,9 +190,9 @@ const TimelineItem: React.FC<Props> = ({
         onClick={handleContentClick}
       >
         {/* Left Timeline Line */}
-        <div className="flex flex-col items-center">
+        <div className="flex flex-col items-center w-4 flex-shrink-0">
           <div
-            className="z-10 w-6 h-6 mt-1 flex items-center justify-center cursor-pointer"
+            className="z-10 w-4 h-4 mt-1 flex items-center justify-center cursor-pointer"
             onClick={(e) => {
               e.stopPropagation();
               toggleCollapse();
@@ -220,7 +220,7 @@ const TimelineItem: React.FC<Props> = ({
         </div>
 
         {/* Right Content */}
-        <div className={`flex-1 ${isCollapsed ? 'pb-4' : 'pb-8'}`}>
+        <div className={`flex-1 ${isCollapsed ? 'pb-3' : 'pb-5'}`}>
           {/* Header: Emoji, Label, Time, Score, Edit */}
           <div
             className="flex items-center justify-between cursor-pointer"

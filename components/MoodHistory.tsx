@@ -2,6 +2,30 @@ import React, { useState, useMemo } from 'react';
 import { DiaryEntry } from '../types';
 import { MoodOption, getHexFromTailwind, ICONS } from '../constants';
 
+// 复制文本到剪贴板
+const copyToClipboard = async (text: string): Promise<boolean> => {
+  try {
+    if (navigator.clipboard && window.isSecureContext) {
+      await navigator.clipboard.writeText(text);
+      return true;
+    }
+    // Fallback for non-secure contexts
+    const textArea = document.createElement('textarea');
+    textArea.value = text;
+    textArea.style.position = 'fixed';
+    textArea.style.left = '-999999px';
+    document.body.appendChild(textArea);
+    textArea.focus();
+    textArea.select();
+    const result = document.execCommand('copy');
+    document.body.removeChild(textArea);
+    return result;
+  } catch (err) {
+    console.error('复制失败:', err);
+    return false;
+  }
+};
+
 interface Props {
   entries: DiaryEntry[];
   allMoods: MoodOption[];
@@ -13,6 +37,9 @@ const MoodHistory: React.FC<Props> = ({ entries, allMoods, selectedMood, timeRan
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   // 折叠状态：存储哪些日期被折叠（默认全部展开）
   const [collapsedDates, setCollapsedDates] = useState<Set<string>>(new Set());
+  // 复制状态
+  const [isCopying, setIsCopying] = useState(false);
+  const [copySuccess, setCopySuccess] = useState(false);
 
   // 当筛选条件变化时，清除日期选择和折叠状态
   React.useEffect(() => {
@@ -173,6 +200,80 @@ const MoodHistory: React.FC<Props> = ({ entries, allMoods, selectedMood, timeRan
     month: '2-digit',
     day: '2-digit'
   }).replace(/\//g, '-');
+
+  // 格式化记录为文本（方案A格式）
+  const formatEntriesForCopy = useMemo(() => {
+    if (entries.length === 0) return '';
+
+    // 按日期分组
+    const grouped: Record<string, DiaryEntry[]> = {};
+    entries.forEach(entry => {
+      const dateStr = new Date(entry.timestamp).toLocaleDateString('zh-CN', {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit'
+      }).replace(/\//g, '-');
+      if (!grouped[dateStr]) grouped[dateStr] = [];
+      grouped[dateStr].push(entry);
+    });
+
+    // 获取日期范围
+    const dates = Object.keys(grouped).sort();
+    const startDate = dates[dates.length - 1]; // 最早的日期（按时间倒序）
+    const endDate = dates[0]; // 最晚的日期
+
+    // 构建文本
+    let text = `📊 情绪日记报告 (${startDate} 至 ${endDate})\n`;
+    if (selectedMood) {
+      text += `🎯 筛选心情：${selectedMood}\n`;
+    }
+    text += `📝 共 ${entries.length} 条记录\n\n`;
+
+    // 按日期倒序遍历
+    dates.forEach(dateStr => {
+      const date = new Date(dateStr);
+      const weekday = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'][date.getDay()];
+      text += `${dateStr} ${weekday}\n━━━━━━━━━━━━━━━\n`;
+
+      // 每天内的记录按时间正序排序
+      const dayEntries = grouped[dateStr].sort((a, b) => a.timestamp - b.timestamp);
+      dayEntries.forEach(entry => {
+        const time = new Date(entry.timestamp).toLocaleTimeString('zh-CN', {
+          hour: '2-digit',
+          minute: '2-digit'
+        });
+        const moodConfig = getMoodConfig(entry.mood);
+        const emoji = moodConfig?.emoji || '🏷️';
+        const energyText = entry.energyDelta !== undefined
+          ? ` (${entry.energyDelta >= 0 ? '+' : ''}${entry.energyDelta}分)`
+          : '';
+
+        // 清理HTML标签
+        const plainContent = entry.content.replace(/<[^>]*>/g, '');
+
+        text += `\n🕐 ${time}  ${emoji} ${entry.mood}${energyText}\n`;
+        if (plainContent) {
+          text += `内容：${plainContent}\n`;
+        }
+      });
+
+      text += '\n\n';
+    });
+
+    return text.trim();
+  }, [entries, selectedMood]);
+
+  // 处理复制
+  const handleCopy = async () => {
+    if (entries.length === 0) return;
+    setIsCopying(true);
+    const success = await copyToClipboard(formatEntriesForCopy);
+    setIsCopying(false);
+    if (success) {
+      setCopySuccess(true);
+      setTimeout(() => setCopySuccess(false), 2000);
+    }
+  };
 
   if (entries.length === 0) {
     return (
@@ -340,6 +441,35 @@ const MoodHistory: React.FC<Props> = ({ entries, allMoods, selectedMood, timeRan
       {/* 按日期分组的记录列表 (当没有选中日期时显示) */}
       {!selectedDate && (
         <div className="space-y-3">
+          {/* 复制按钮 */}
+          <div className="flex justify-end px-1">
+            <button
+              onClick={handleCopy}
+              disabled={isCopying || entries.length === 0}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-sm font-medium transition-all active:scale-95 ${
+                copySuccess
+                  ? 'bg-green-500 text-white'
+                  : 'bg-gray-800 text-white hover:bg-gray-700'
+              } ${isCopying ? 'opacity-70' : ''}`}
+            >
+              {copySuccess ? (
+                <>
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  </svg>
+                  已复制
+                </>
+              ) : (
+                <>
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3" />
+                  </svg>
+                  复制全部
+                </>
+              )}
+            </button>
+          </div>
+
           {groupedEntries.map(({ dateStr, entries: dayEntries }) => {
             const isCollapsed = collapsedDates.has(dateStr);
             const date = new Date(dateStr);
