@@ -40,6 +40,7 @@ const DiaryEntryForm: React.FC<Props> = ({ initialData, onSave, onClose, customM
   const [activeColor, setActiveColor] = useState<string>('#374151');
   const [durationInput, setDurationInput] = useState<string>(''); // 持续时间输入
   const [isActive, setIsActive] = useState(false); // 是否进行中
+  const [entryTime, setEntryTime] = useState<string>(''); // 记录时间 (HH:MM)
   const contentRef = useRef<HTMLDivElement>(null);
 
   // 获取合并了自定义配置的内置心情列表
@@ -113,6 +114,18 @@ const DiaryEntryForm: React.FC<Props> = ({ initialData, onSave, onClose, customM
 
       // 初始化进行中状态
       setIsActive(initialData.isActive || false);
+
+      // 初始化记录时间
+      const date = new Date(initialData.timestamp);
+      const hours = date.getHours().toString().padStart(2, '0');
+      const minutes = date.getMinutes().toString().padStart(2, '0');
+      setEntryTime(`${hours}:${minutes}`);
+    } else {
+      // 新建模式：默认使用当前时间
+      const now = new Date();
+      const hours = now.getHours().toString().padStart(2, '0');
+      const minutes = now.getMinutes().toString().padStart(2, '0');
+      setEntryTime(`${hours}:${minutes}`);
     }
   }, [initialData, customMoods]);
 
@@ -277,6 +290,17 @@ const DiaryEntryForm: React.FC<Props> = ({ initialData, onSave, onClose, customM
       duration = parsed;
     }
 
+    // 解析记录时间 (HH:MM)
+    let entryHours = new Date().getHours();
+    let entryMinutes = new Date().getMinutes();
+    if (entryTime) {
+      const [h, m] = entryTime.split(':').map(Number);
+      if (!isNaN(h) && !isNaN(m)) {
+        entryHours = h;
+        entryMinutes = m;
+      }
+    }
+
     onSave({
       id: initialData?.id,
       timestamp: initialData?.timestamp,
@@ -290,6 +314,9 @@ const DiaryEntryForm: React.FC<Props> = ({ initialData, onSave, onClose, customM
       isActive: isActive,
       // 手动填写持续时间时优先使用 duration，不保留 endTimestamp
       endTimestamp: duration ? undefined : initialData?.endTimestamp,
+      // 传递用户选择的时间（时分）
+      entryHours,
+      entryMinutes,
     });
 
     onClose();
@@ -626,6 +653,18 @@ const DiaryEntryForm: React.FC<Props> = ({ initialData, onSave, onClose, customM
                   </button>
                 ))}
               </div>
+            </div>
+
+            {/* 记录时间选择 */}
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-gray-600 block">🕐 记录时间</label>
+              <input
+                type="time"
+                value={entryTime}
+                onChange={(e) => setEntryTime(e.target.value)}
+                className="w-full px-4 py-3 bg-white rounded-2xl border border-gray-200 focus:border-indigo-300 focus:outline-none transition-colors text-sm"
+              />
+              <p className="text-xs text-gray-400">默认为当前时间，可修改为今天的其他时刻</p>
             </div>
 
             {/* 富文本编辑区域 */}

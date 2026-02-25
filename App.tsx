@@ -210,7 +210,7 @@ const App: React.FC = () => {
   }, [selectedDate, isLoading]);
 
   // 保存日记条目
-  const handleSaveEntry = useCallback(async (formData: Omit<DiaryEntry, 'id' | 'timestamp'> & { id?: string, timestamp?: number }) => {
+  const handleSaveEntry = useCallback(async (formData: Omit<DiaryEntry, 'id' | 'timestamp'> & { id?: string, timestamp?: number, entryHours?: number, entryMinutes?: number }) => {
     try {
       if (formData.id) {
         // 更新现有条目
