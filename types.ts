@@ -150,7 +150,7 @@ export interface WeeklyReport {
 // 导师系统
 // ==========================================
 
-export type MentorType = 'naval' | 'munger' | 'wangyangming' | 'sushi' | 'zengguofan' | 'buddha' | 'murakami' | 'musk';
+export type MentorType = 'naval' | 'munger' | 'wangyangming' | 'sushi' | 'zengguofan' | 'buddha' | 'murakami' | 'musk' | 'positive-psychology';
 
 export interface MentorConfig {
   id: MentorType;
