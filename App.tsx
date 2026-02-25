@@ -6,6 +6,7 @@ import DiaryEntryForm from './components/DiaryEntryForm';
 import Dashboard from './components/Dashboard';
 import CalendarStrip from './components/CalendarStrip';
 import DailyMoodChart from './components/DailyMoodChart';
+import AIDiaryCard from './components/AIDiaryCard';
 import EnergyBattery from './components/EnergyBattery';
 import WeeklyGoal from './components/WeeklyGoal';
 import TimelineItem from './components/TimelineItem';
@@ -58,6 +59,10 @@ const App: React.FC = () => {
   const [commentSheetEntry, setCommentSheetEntry] = useState<DiaryEntry | null>(null);
   const [commentSheetData, setCommentSheetData] = useState<EntryComment[]>([]);
   const [entryCommentCounts, setEntryCommentCounts] = useState<Record<string, number>>({});
+
+  // AI日记相关状态
+  const [aiDiaryContent, setAiDiaryContent] = useState<string>('');
+  const [aiDiaryGeneratedAt, setAiDiaryGeneratedAt] = useState<number | undefined>();
 
   // 初始化数据库并加载数据
   useEffect(() => {
@@ -153,6 +158,22 @@ const App: React.FC = () => {
 
     return () => clearInterval(interval);
   }, []);
+
+  // 当日期切换时加载AI日记
+  useEffect(() => {
+    const loadAIDiary = async () => {
+      const dateStr = selectedDate.toISOString().split('T')[0];
+      try {
+        const aiDiary = await databaseService.getAIDiary(dateStr);
+        setAiDiaryContent(aiDiary.content || '');
+        setAiDiaryGeneratedAt(aiDiary.generatedAt);
+      } catch (error) {
+        console.error('加载AI日记失败:', error);
+      }
+    };
+
+    loadAIDiary();
+  }, [selectedDate]);
 
   // 处理安卓返回键/手势返回
   useEffect(() => {
@@ -868,6 +889,18 @@ const App: React.FC = () => {
                  <DailyMoodChart entries={timelineEntries} customMoods={effectiveCustomMoods} />
               </div>
             )}
+
+            {/* AI晨间日记 */}
+            <AIDiaryCard
+              date={selectedDate}
+              entries={timelineEntries}
+              initialContent={aiDiaryContent}
+              initialGeneratedAt={aiDiaryGeneratedAt}
+              onContentGenerated={(content) => {
+                setAiDiaryContent(content);
+                setAiDiaryGeneratedAt(Date.now());
+              }}
+            />
 
             {/* Daily Note Editor - 今日笔记 */}
             <div className="mb-4 animate-in fade-in slide-in-from-bottom-6 duration-700">

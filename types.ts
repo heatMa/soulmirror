@@ -63,6 +63,10 @@ export interface DailyJournal {
   deepReflection?: string;                           // AI深度回看内容（纯文本）
   deepReflectionSource?: 'journal-only' | 'moods-only' | 'journal-with-moods';  // 分析来源
   deepReflectionTimestamp?: number;                  // AI分析生成时间戳
+  // AI日记字段
+  aiDiary?: string;                                  // AI晨间日记内容（Markdown格式）
+  aiDiaryGeneratedAt?: number;                       // AI日记生成时间戳
+  aiDiaryNotified?: boolean;                         // 是否已推送通知
 }
 
 // 备份数据接口

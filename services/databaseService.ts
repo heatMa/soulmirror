@@ -38,7 +38,10 @@ CREATE TABLE IF NOT EXISTS daily_notes (
   content TEXT NOT NULL,
   deep_reflection TEXT,
   deep_reflection_source TEXT,
-  deep_reflection_timestamp INTEGER
+  deep_reflection_timestamp INTEGER,
+  ai_diary TEXT,
+  ai_diary_generated_at INTEGER,
+  ai_diary_notified INTEGER DEFAULT 0
 );
 
 CREATE TABLE IF NOT EXISTS custom_moods (
@@ -242,6 +245,26 @@ class DatabaseService {
       if (!hasDeepReflectionTimestamp) {
         await this.db.execute('ALTER TABLE daily_notes ADD COLUMN deep_reflection_timestamp INTEGER');
         console.log('数据库迁移：添加 deep_reflection_timestamp 列');
+      }
+
+      // 检查 daily_notes 表是否有AI日记相关列
+      const hasAiDiary = notesColumns.some((col: any) => col.name === 'ai_diary');
+      const hasAiDiaryGeneratedAt = notesColumns.some((col: any) => col.name === 'ai_diary_generated_at');
+      const hasAiDiaryNotified = notesColumns.some((col: any) => col.name === 'ai_diary_notified');
+
+      if (!hasAiDiary) {
+        await this.db.execute('ALTER TABLE daily_notes ADD COLUMN ai_diary TEXT');
+        console.log('数据库迁移：添加 ai_diary 列');
+      }
+
+      if (!hasAiDiaryGeneratedAt) {
+        await this.db.execute('ALTER TABLE daily_notes ADD COLUMN ai_diary_generated_at INTEGER');
+        console.log('数据库迁移：添加 ai_diary_generated_at 列');
+      }
+
+      if (!hasAiDiaryNotified) {
+        await this.db.execute('ALTER TABLE daily_notes ADD COLUMN ai_diary_notified INTEGER DEFAULT 0');
+        console.log('数据库迁移：添加 ai_diary_notified 列');
       }
 
       // 检查 diary_entries 表是否有持续时间相关列
@@ -533,7 +556,10 @@ class DatabaseService {
         content: row.content as string,
         deepReflection: row.deep_reflection as string | undefined,
         deepReflectionSource: row.deep_reflection_source as string | undefined,
-        deepReflectionTimestamp: row.deep_reflection_timestamp as number | undefined
+        deepReflectionTimestamp: row.deep_reflection_timestamp as number | undefined,
+        aiDiary: row.ai_diary as string | undefined,
+        aiDiaryGeneratedAt: row.ai_diary_generated_at as number | undefined,
+        aiDiaryNotified: Boolean(row.ai_diary_notified)
       };
     } else {
       const notes = await this.getAllDailyNotes();
@@ -564,7 +590,10 @@ class DatabaseService {
           content: row.content as string,
           deepReflection: row.deep_reflection as string | undefined,
           deepReflectionSource: row.deep_reflection_source as string | undefined,
-          deepReflectionTimestamp: row.deep_reflection_timestamp as number | undefined
+          deepReflectionTimestamp: row.deep_reflection_timestamp as number | undefined,
+          aiDiary: row.ai_diary as string | undefined,
+          aiDiaryGeneratedAt: row.ai_diary_generated_at as number | undefined,
+          aiDiaryNotified: Boolean(row.ai_diary_notified)
         };
       });
       return notes;
@@ -652,6 +681,57 @@ class DatabaseService {
         delete notes[dateStr].deepReflectionTimestamp;
         localStorage.setItem(STORAGE_KEYS.NOTES, JSON.stringify(notes));
       }
+    }
+  }
+
+  /**
+   * 更新AI日记内容
+   */
+  async updateAIDiary(dateStr: string, content: string): Promise<void> {
+    await this.ensureInitialized();
+
+    if (this.isNative && this.db) {
+      await this.db.run(
+        `UPDATE daily_notes
+         SET ai_diary = ?, ai_diary_generated_at = ?, ai_diary_notified = 1
+         WHERE date_str = ?`,
+        [content, Date.now(), dateStr]
+      );
+    } else {
+      const notes = await this.getAllDailyNotes();
+      if (!notes[dateStr]) {
+        notes[dateStr] = { content: '', date: dateStr };
+      }
+      notes[dateStr].aiDiary = content;
+      notes[dateStr].aiDiaryGeneratedAt = Date.now();
+      notes[dateStr].aiDiaryNotified = true;
+      localStorage.setItem(STORAGE_KEYS.NOTES, JSON.stringify(notes));
+    }
+  }
+
+  /**
+   * 获取AI日记内容
+   */
+  async getAIDiary(dateStr: string): Promise<{ content?: string; generatedAt?: number }> {
+    await this.ensureInitialized();
+
+    if (this.isNative && this.db) {
+      const result = await this.db.query(
+        'SELECT ai_diary, ai_diary_generated_at FROM daily_notes WHERE date_str = ?',
+        [dateStr]
+      );
+      const row = result.values?.[0];
+      return {
+        content: row?.ai_diary,
+        generatedAt: row?.ai_diary_generated_at
+      };
+    } else {
+      const notes = await this.getAllDailyNotes();
+      const note = notes[dateStr];
+      return {
+        content: note?.aiDiary,
+        generatedAt: note?.aiDiaryGeneratedAt
+      };
     }
   }
 

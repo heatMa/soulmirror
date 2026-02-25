@@ -131,13 +131,64 @@ export async function scheduleExperimentReminder(experimentTitle: string, dayOfW
 }
 
 /**
+ * 设置AI晨间日记通知（每天早上 7:00）
+ */
+export async function scheduleAIDiaryNotification(): Promise<void> {
+  if (!isNative) return;
+
+  const hasPermission = await checkNotificationPermission();
+  if (!hasPermission) {
+    console.log('没有通知权限，跳过设置AI日记通知');
+    return;
+  }
+
+  try {
+    // 取消之前的AI日记通知
+    await LocalNotifications.cancel({ notifications: [{ id: 3 }] });
+
+    const now = new Date();
+    const next7am = new Date(now);
+    next7am.setHours(7, 0, 0, 0);
+
+    // 如果已经过了今天7点，设置为明天7点
+    if (now.getHours() >= 7) {
+      next7am.setDate(now.getDate() + 1);
+    }
+
+    await LocalNotifications.schedule({
+      notifications: [
+        {
+          id: 3,
+          title: '📝 你的AI晨间日记已生成',
+          body: '基于昨天的情绪记录，为你准备了今日复盘',
+          schedule: {
+            at: next7am,
+            repeats: true,
+            every: 'day'
+          },
+          extra: {
+            type: 'ai_diary'
+          },
+          iconColor: '#f59e0b', // 琥珀色
+          sound: 'default'
+        }
+      ]
+    });
+
+    console.log('AI日记通知已设置:', next7am.toLocaleString());
+  } catch (error) {
+    console.error('设置AI日记通知失败:', error);
+  }
+}
+
+/**
  * 取消所有通知
  */
 export async function cancelAllNotifications(): Promise<void> {
   if (!isNative) return;
-  
+
   try {
-    await LocalNotifications.cancel({ notifications: [{ id: 1 }, { id: 2 }] });
+    await LocalNotifications.cancel({ notifications: [{ id: 1 }, { id: 2 }, { id: 3 }] });
     console.log('所有通知已取消');
   } catch (error) {
     console.error('取消通知失败:', error);
@@ -170,6 +221,7 @@ export async function initializeNotifications(): Promise<void> {
     const hasPermission = await requestNotificationPermission();
     if (hasPermission) {
       await scheduleWeeklyReportNotification();
+      await scheduleAIDiaryNotification();
     }
     
     // 监听通知点击（可选，失败不影响主功能）

@@ -780,6 +780,83 @@ ${hasMultipleSources ? `# Input Context
   }
 };
 
+// ==========================================
+// AI晨间日记生成
+// ==========================================
+
+export const generateAIDiary = async (
+  entries: DiaryEntry[],
+  dateStr: string
+): Promise<string> => {
+  if (entries.length === 0) {
+    return '暂无情绪记录，无法生成日记。';
+  }
+
+  // 格式化情绪记录
+  const sortedEntries = [...entries].sort((a, b) => a.timestamp - b.timestamp);
+
+  const entriesSummary = sortedEntries.map(e => {
+    const time = new Date(e.timestamp).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
+    const emoji = e.moodEmoji || '📝';
+    const contentText = e.content.replace(/<[^>]*>/g, '').trim();
+    const duration = getEntryDurationMinutes(e);
+    const durationStr = duration ? `，持续${formatDuration(duration)}` : '';
+    const energyDelta = e.energyDelta ?? e.moodScore ?? 0;
+    return `${emoji} ${e.mood} (${time}，能量值${energyDelta > 0 ? '+' : ''}${energyDelta}${durationStr})\n${contentText || '（无详细内容）'}`;
+  }).join('\n\n');
+
+  const systemPrompt = `你是用户的AI晨间日记助手。基于用户前一天的情绪记录，生成一份结构化的晨间复盘日记。
+
+请严格按照以下格式输出：
+
+## 今天的关键词
+- 关键词1（简短解释）
+- 关键词2（简短解释）
+- 关键词3（简短解释）
+
+## 今天3件超出预期的事
+1. **第一件事**：描述发生了什么，为什么超出预期...
+2. **第二件事**：描述发生了什么，为什么超出预期...
+3. **第三件事**：描述发生了什么，为什么超出预期...
+
+## 今天的痛点、内耗，下次如何改进
+**痛点1**：描述具体的痛点或内耗场景...
+**改进**：下次可以这样做...
+
+**痛点2**：（如果有的话）...
+**改进**：...
+
+## 写给今天的一句话
+一句鼓励的话或提醒...
+
+## 要求：
+- 基于用户记录的事实，不做过度推断
+- 语气温暖、客观、有洞察力
+- 如果某些部分没有足够数据，可以写「暂无记录」
+- 痛点和改进建议要具体可行，避免空泛的安慰
+- 总字数控制在300-500字之间
+- 使用中文标点符号`;
+
+  const userPrompt = `日期：${dateStr}
+
+昨天的情绪记录（按时间顺序）：
+
+${entriesSummary}`;
+
+  try {
+    if (CURRENT_PROVIDER === 'DEEPSEEK') {
+      console.log('Using DeepSeek for AI Diary...');
+      const result = await callDeepSeekText(systemPrompt, userPrompt);
+      return result.trim();
+    } else {
+      throw new Error('Gemini provider not configured. Please use DEEPSEEK.');
+    }
+  } catch (error) {
+    console.error(`AI Diary generation failed (${CURRENT_PROVIDER}):`, error);
+    throw new Error('AI晨间日记生成失败，请稍后重试');
+  }
+};
+
 // 分析情绪触发因素
 export const analyzeTriggerFactors = async (entries: DiaryEntry[]): Promise<TriggerAnalysis> => {
   if (entries.length === 0) {
