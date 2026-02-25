@@ -6,6 +6,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 美好时光 (SoulMirror) is an AI-powered emotional diary (情绪日记) mobile app built with React and Capacitor. It helps users track their moods, write daily reflections, and receive AI-generated emotional analysis and suggestions.
 
+### Repository
+
+- **GitHub**: `git@github.com:heatMa/soulmirror.git`
+- **Primary Remote**: GitHub (push here)
+
 ## Development Commands
 
 ```bash
@@ -294,6 +299,37 @@ npm run build
 npx cap sync android
 # Then build APK in Android Studio
 ```
+
+## Git Workflow
+
+### Repository Remotes
+
+```bash
+# View remotes
+git remote -v
+
+# Primary: GitHub (always push here)
+git@github.com:heatMa/soulmirror.git
+
+# Legacy: Gitee (read-only, do not push)
+https://gitee.com/.../soulmirror.git
+```
+
+### Commit and Push
+
+```bash
+# Stage and commit
+git add -A
+git commit -m "feat: your message"
+
+# Push to GitHub (primary)
+git push github master
+
+# Or use the full remote URL if 'github' alias not configured
+git push git@github.com:heatMa/soulmirror.git master
+```
+
+**Always push to GitHub**, not Gitee.
 
 ## Reference
 
