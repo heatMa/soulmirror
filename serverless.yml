@@ -1,0 +1,49 @@
+# 腾讯云 Serverless 部署配置
+# 用于部署 SoulMirror AI 疗愈日记网页版到腾讯云
+
+service: soulmirror
+
+provider:
+  name: tencentcloud
+  region: ap-guangzhou
+  runtime: Nodejs18
+  
+plugins:
+  - serverless-tencent-scf
+  - serverless-tencent-cos
+
+# 腾讯云 COS 配置 - 静态网站托管
+custom:
+  cos:
+    bucket: soulmirror-web-${self:provider.stage}
+    region: ${self:provider.region}
+    website:
+      indexDocument: index.html
+      errorDocument: index.html
+    # 上传配置
+    upload:
+      - src: ./dist
+        ignore:
+          - .git/**
+          - .gitignore
+          - node_modules/**
+          - android/**
+          - "*.md"
+          - "*.log"
+
+# 可选: 使用 CDN 加速
+cdn:
+  host: soulmirror.yourdomain.com  # 替换为你的域名
+  https: true
+  cache:
+    expire: 86400  # 缓存1天
+
+# 云函数配置 (可选，用于API代理)
+functions:
+  api:
+    handler: dist/_worker.js
+    events:
+      - apigw:
+          path: /api/{proxy+}
+          method: ANY
+          cors: true

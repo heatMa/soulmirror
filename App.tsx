@@ -214,9 +214,17 @@ const App: React.FC = () => {
     try {
       if (formData.id) {
         // 更新现有条目
+        // 如果有新的时间设置，更新时间戳
+        let timestamp = formData.timestamp || Date.now();
+        if (formData.entryHours !== undefined && formData.entryMinutes !== undefined) {
+          const date = new Date(timestamp);
+          date.setHours(formData.entryHours, formData.entryMinutes, 0);
+          timestamp = date.getTime();
+        }
+
         const updatedEntry: DiaryEntry = {
           id: formData.id,
-          timestamp: formData.timestamp || Date.now(),
+          timestamp: timestamp,
           content: formData.content,
           mood: formData.mood,
           moodScore: formData.moodScore, // 会被 AI 评分覆盖
@@ -295,9 +303,18 @@ const App: React.FC = () => {
           d1.getMonth() === d2.getMonth() &&
           d1.getFullYear() === d2.getFullYear();
 
+        // 使用用户选择的时间（如果有）
+        const entryHours = formData.entryHours ?? now.getHours();
+        const entryMinutes = formData.entryMinutes ?? now.getMinutes();
+
         if (!isSameDay(selectedDate, now)) {
           const targetTime = new Date(selectedDate);
-          targetTime.setHours(now.getHours(), now.getMinutes(), now.getSeconds());
+          targetTime.setHours(entryHours, entryMinutes, 0);
+          timestamp = targetTime.getTime();
+        } else {
+          // 同一天，使用用户选择的时间
+          const targetTime = new Date(selectedDate);
+          targetTime.setHours(entryHours, entryMinutes, 0);
           timestamp = targetTime.getTime();
         }
 

@@ -15,6 +15,9 @@ export interface DiaryEntry {
   isActive?: boolean; // 是否进行中（未结束）
   energyDelta?: number; // 本条记录的能量变化值（-10到+10，能量系统）
   scoreVersion?: 'v1' | 'v2'; // 分数版本标记，用于数据迁移（v2 为当前版本）
+  // 表单提交时使用的时间字段（不入库）
+  entryHours?: number;
+  entryMinutes?: number;
 }
 
 export interface AIAnalysis {
