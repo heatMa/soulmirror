@@ -19,6 +19,9 @@ export interface DiaryEntry {
   entryHours?: number;
   entryMinutes?: number;
   resolved_at?: string | null; // 情绪已好转时间（ISO字符串），null 表示尚未好转
+  // 表单提交时使用的时间字段（不入库）
+  entryHours?: number;
+  entryMinutes?: number;
 }
 
 export interface EntryComment {
