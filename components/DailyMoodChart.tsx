@@ -129,9 +129,11 @@ const DailyMoodChart: React.FC<Props> = ({ entries, customMoods = [] }) => {
       .map((e) => {
         const date = new Date(e.timestamp);
         const hour = date.getHours() + date.getMinutes() / 60;
+        // 优先使用 energyDelta，如果没有则使用 moodScore，兼容旧数据
+        const delta = e.energyDelta ?? e.moodScore ?? 0;
         return {
           hour,
-          delta: e.energyDelta ?? 0,  // 使用 energyDelta 字段
+          delta,
           mood: e.mood,
           content: e.content,
           time: date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
@@ -141,6 +143,21 @@ const DailyMoodChart: React.FC<Props> = ({ entries, customMoods = [] }) => {
 
     return points;
   }, [entries]);
+
+  // 自动调整时间范围以包含所有数据点
+  const effectiveTimeRange = useMemo(() => {
+    if (entryPoints.length === 0) return timeRange;
+
+    const hours = entryPoints.map(p => p.hour);
+    const minHour = Math.min(...hours);
+    const maxHour = Math.max(...hours);
+
+    // 如果数据点在当前范围外，扩展范围
+    const startHour = Math.min(timeRange.startHour, Math.floor(minHour));
+    const endHour = Math.max(timeRange.endHour, Math.ceil(maxHour) + 1);
+
+    return { startHour, endHour };
+  }, [entryPoints, timeRange]);
 
   // 有持续时间的记录，用于绘制背景色块
   const durationRanges = useMemo(() => {
@@ -154,13 +171,13 @@ const DailyMoodChart: React.FC<Props> = ({ entries, customMoods = [] }) => {
         const endHour = startHour + minutes / 60;
         return {
           x1: startHour,
-          x2: Math.min(endHour, timeRange.endHour),
+          x2: Math.min(endHour, effectiveTimeRange.endHour),
           hexColor: getMoodHexColor(e.mood, e),
           mood: e.mood
         };
       })
       .filter(Boolean) as { x1: number; x2: number; hexColor: string; mood: string }[];
-  }, [entries, timeRange.endHour]);
+  }, [entries, effectiveTimeRange.endHour]);
 
   // 获取当前小时用于显示参考线
   const currentHour = new Date().getHours() + new Date().getMinutes() / 60;
@@ -173,7 +190,7 @@ const DailyMoodChart: React.FC<Props> = ({ entries, customMoods = [] }) => {
 
   // 生成横轴刻度
   const generateTicks = () => {
-    const { startHour, endHour } = timeRange;
+    const { startHour, endHour } = effectiveTimeRange;
     const ticks = [startHour];
     const mid = Math.floor((startHour + endHour) / 2);
     if (mid !== startHour && mid !== endHour) {
@@ -283,7 +300,7 @@ const DailyMoodChart: React.FC<Props> = ({ entries, customMoods = [] }) => {
             <XAxis
               dataKey="hour"
               type="number"
-              domain={[timeRange.startHour, timeRange.endHour]}
+              domain={[effectiveTimeRange.startHour, effectiveTimeRange.endHour]}
               allowDataOverflow={true}
               axisLine={false}
               tickLine={false}

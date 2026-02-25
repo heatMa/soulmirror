@@ -150,10 +150,10 @@ const EnergyBattery: React.FC<Props> = ({ entries, allEntries, customMoods = [] 
       const hexColor = entry.moodHexColor || config?.hexColor || getHexFromTailwind(config?.color || 'bg-gray-400');
       // 使用 energyDelta（能量变化值），如果没有则用 moodScore
       const score = entry.energyDelta ?? entry.moodScore ?? 1;
-      
+
       // 获取持续时间（分钟）
       const durationMinutes = getEntryDurationMinutes(entry);
-      
+
       // 计算持续时间权重：持续时间越长，块越宽
       // 公式：基础宽度 + 持续时间加成（最长3倍加成）
       const durationWeight = durationMinutes ? Math.min(durationMinutes / 60, 3) : 0;
@@ -175,6 +175,20 @@ const EnergyBattery: React.FC<Props> = ({ entries, allEntries, customMoods = [] 
       };
     });
   }, [entries, allMoodConfigs, pxPerScore]);
+
+  // 将块分成正能量和负能量两组（各自保持时间顺序）
+  const { positiveBlocks, negativeBlocks } = useMemo(() => {
+    const positive: BlockData[] = [];
+    const negative: BlockData[] = [];
+    blocks.forEach(block => {
+      if (block.score >= 0) {
+        positive.push(block);
+      } else {
+        negative.push(block);
+      }
+    });
+    return { positiveBlocks: positive, negativeBlocks: negative };
+  }, [blocks]);
 
   // 计算缩放比例（当块总宽度超出容器时）
   const scaleFactor = useMemo(() => {
@@ -226,26 +240,81 @@ const EnergyBattery: React.FC<Props> = ({ entries, allEntries, customMoods = [] 
         </div>
       </div>
 
-      {/* 能量条 */}
+      {/* 能量条 - 分两行显示，保持时间对齐 */}
       <div
         ref={containerRef}
-        className="relative h-12 bg-gray-200/50 rounded-xl overflow-hidden flex items-center p-1"
+        className="relative bg-gray-200/50 rounded-xl overflow-hidden p-1 flex flex-col"
         style={{ gap: `${GAP * scaleFactor}px` }}
       >
-        {blocks.map((block) => (
-          <button
-            key={block.id}
-            onClick={() => setSelectedBlock(selectedBlock?.id === block.id ? null : block)}
-            className={`h-full rounded-lg transition-all duration-200 hover:opacity-80 active:scale-95 flex-shrink-0 ${
-              selectedBlock?.id === block.id ? 'ring-2 ring-gray-800 ring-offset-1' : ''
-            }`}
-            style={{
-              width: `${block.widthPx * scaleFactor}px`,
-              backgroundColor: block.hexColor,
-            }}
-            title={`${block.mood} ${block.score.toFixed(1)}分${block.durationMinutes ? ` · ${formatDuration(block.durationMinutes)}` : ''}`}
-          />
-        ))}
+        {/* 第一行：正能量（负能量用占位符填充保持对齐） */}
+        <div
+          className="h-6 flex items-center"
+          style={{ gap: `${GAP * scaleFactor}px` }}
+        >
+          {blocks.length > 0 ? (
+            blocks.map((block) =>
+              block.score >= 0 ? (
+                <button
+                  key={block.id}
+                  onClick={() => setSelectedBlock(selectedBlock?.id === block.id ? null : block)}
+                  className={`h-full rounded-lg transition-all duration-200 hover:opacity-80 active:scale-95 flex-shrink-0 ${
+                    selectedBlock?.id === block.id ? 'ring-2 ring-gray-800 ring-offset-1' : ''
+                  }`}
+                  style={{
+                    width: `${block.widthPx * scaleFactor}px`,
+                    backgroundColor: block.hexColor,
+                  }}
+                  title={`${block.mood} ${block.score.toFixed(1)}分${block.durationMinutes ? ` · ${formatDuration(block.durationMinutes)}` : ''}`}
+                />
+              ) : (
+                <div
+                  key={`placeholder-${block.id}`}
+                  className="h-full flex-shrink-0"
+                  style={{ width: `${block.widthPx * scaleFactor}px` }}
+                />
+              )
+            )
+          ) : (
+            <div className="w-full h-full flex items-center justify-center">
+              <span className="text-[10px] text-gray-400">暂无记录</span>
+            </div>
+          )}
+        </div>
+
+        {/* 第二行：负能量（正能量用占位符填充保持对齐） */}
+        <div
+          className="h-6 flex items-center"
+          style={{ gap: `${GAP * scaleFactor}px` }}
+        >
+          {blocks.length > 0 ? (
+            blocks.map((block) =>
+              block.score < 0 ? (
+                <button
+                  key={block.id}
+                  onClick={() => setSelectedBlock(selectedBlock?.id === block.id ? null : block)}
+                  className={`h-full rounded-lg transition-all duration-200 hover:opacity-80 active:scale-95 flex-shrink-0 ${
+                    selectedBlock?.id === block.id ? 'ring-2 ring-gray-800 ring-offset-1' : ''
+                  }`}
+                  style={{
+                    width: `${block.widthPx * scaleFactor}px`,
+                    backgroundColor: block.hexColor,
+                  }}
+                  title={`${block.mood} ${block.score.toFixed(1)}分${block.durationMinutes ? ` · ${formatDuration(block.durationMinutes)}` : ''}`}
+                />
+              ) : (
+                <div
+                  key={`placeholder-${block.id}`}
+                  className="h-full flex-shrink-0"
+                  style={{ width: `${block.widthPx * scaleFactor}px` }}
+                />
+              )
+            )
+          ) : (
+            <div className="w-full h-full flex items-center justify-center">
+              <span className="text-[10px] text-gray-400">暂无记录</span>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* 气泡提示 */}
