@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { DiaryEntry } from '../types';
 import { MoodOption, getHexFromTailwind, ICONS } from '../constants';
+import { databaseService } from '../services/databaseService';
 
 // 复制文本到剪贴板
 const copyToClipboard = async (text: string): Promise<boolean> => {
@@ -40,11 +41,48 @@ const MoodHistory: React.FC<Props> = ({ entries, allMoods, selectedMood, timeRan
   // 复制状态
   const [isCopying, setIsCopying] = useState(false);
   const [copySuccess, setCopySuccess] = useState(false);
+  // 视图模式：列表或卡片
+  const [viewMode, setViewMode] = useState<'list' | 'card'>('card');
+  // 列表模式下展开的条目
+  const [expandedEntryId, setExpandedEntryId] = useState<string | null>(null);
+
+  // 从数据库读取视图偏好（支持 SQLite 和 localStorage 双平台）
+  React.useEffect(() => {
+    const loadViewMode = async () => {
+      try {
+        const settings = await databaseService.getUserSettings();
+        if (settings.moodHistoryViewMode) {
+          setViewMode(settings.moodHistoryViewMode);
+        }
+      } catch (err) {
+        console.error('加载视图偏好失败:', err);
+        // 失败时使用默认值
+      }
+    };
+    loadViewMode();
+  }, []);
+
+  // 保存视图偏好到数据库（支持 SQLite 和 localStorage 双平台）
+  React.useEffect(() => {
+    const saveViewMode = async () => {
+      try {
+        const currentSettings = await databaseService.getUserSettings();
+        await databaseService.saveUserSettings({
+          ...currentSettings,
+          moodHistoryViewMode: viewMode
+        });
+      } catch (err) {
+        console.error('保存视图偏好失败:', err);
+      }
+    };
+    saveViewMode();
+  }, [viewMode]);
 
   // 当筛选条件变化时，清除日期选择和折叠状态
   React.useEffect(() => {
     setSelectedDate(null);
     setCollapsedDates(new Set());
+    setExpandedEntryId(null);
   }, [selectedMood, timeRange]);
 
   // 按日期分组条目
@@ -275,6 +313,16 @@ const MoodHistory: React.FC<Props> = ({ entries, allMoods, selectedMood, timeRan
     }
   };
 
+  // 剥离 HTML 标签
+  const stripHtml = (html: string) => {
+    return html.replace(/<[^>]*>/g, '');
+  };
+
+  // 切换列表条目展开状态
+  const toggleEntryExpand = (entryId: string) => {
+    setExpandedEntryId(expandedEntryId === entryId ? null : entryId);
+  };
+
   if (entries.length === 0) {
     return (
       <div className="glass-card rounded-[2rem] p-6 text-center">
@@ -441,36 +489,180 @@ const MoodHistory: React.FC<Props> = ({ entries, allMoods, selectedMood, timeRan
       {/* 按日期分组的记录列表 (当没有选中日期时显示) */}
       {!selectedDate && (
         <div className="space-y-3">
-          {/* 复制按钮 */}
-          <div className="flex justify-end px-1">
-            <button
-              onClick={handleCopy}
-              disabled={isCopying || entries.length === 0}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-sm font-medium transition-all active:scale-95 ${
-                copySuccess
-                  ? 'bg-green-500 text-white'
-                  : 'bg-gray-800 text-white hover:bg-gray-700'
-              } ${isCopying ? 'opacity-70' : ''}`}
-            >
-              {copySuccess ? (
-                <>
-                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                  </svg>
-                  已复制
-                </>
-              ) : (
-                <>
-                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3" />
-                  </svg>
-                  复制全部
-                </>
-              )}
-            </button>
+          {/* 筛选心情后的视觉反馈横幅 */}
+          {selectedMood && (
+            (() => {
+              const moodConfig = getMoodConfig(selectedMood);
+              const hexColor = moodConfig?.hexColor || getHexFromTailwind(moodConfig?.color || 'bg-gray-400');
+              return (
+                <div
+                  className="px-4 py-3 rounded-xl flex items-center justify-between"
+                  style={{
+                    backgroundColor: `${hexColor}15`,
+                    borderLeft: `3px solid ${hexColor}`
+                  }}
+                >
+                  <div className="flex items-center gap-2">
+                    <span className="text-xl">{moodConfig?.emoji || '🏷️'}</span>
+                    <div>
+                      <span
+                        className="text-sm font-bold"
+                        style={{ color: hexColor }}
+                      >
+                        {selectedMood}
+                      </span>
+                      <span className="text-xs text-gray-500 ml-2">
+                        共 {entries.length} 条记录
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              );
+            })()
+          )}
+
+          {/* 标题栏 + 视图切换 + 复制按钮 */}
+          <div className="flex justify-between items-center px-1">
+            <div className="flex items-center gap-2">
+              <h3 className="text-sm font-bold text-gray-600">记录列表</h3>
+              <span className="text-xs text-gray-400">
+                共 {entries.length} 条
+              </span>
+            </div>
+
+            <div className="flex items-center gap-2">
+              {/* 视图切换按钮 */}
+              <div className="flex items-center bg-white/50 rounded-lg p-0.5">
+                <button
+                  onClick={() => setViewMode('list')}
+                  className={`p-1.5 rounded-md transition-all ${
+                    viewMode === 'list'
+                      ? 'bg-white shadow-sm text-gray-800'
+                      : 'text-gray-400 hover:text-gray-600'
+                  }`}
+                  title="列表视图"
+                >
+                  <ICONS.List />
+                </button>
+                <button
+                  onClick={() => setViewMode('card')}
+                  className={`p-1.5 rounded-md transition-all ${
+                    viewMode === 'card'
+                      ? 'bg-white shadow-sm text-gray-800'
+                      : 'text-gray-400 hover:text-gray-600'
+                  }`}
+                  title="卡片视图"
+                >
+                  <ICONS.Grid />
+                </button>
+              </div>
+
+              {/* 复制按钮 */}
+              <button
+                onClick={handleCopy}
+                disabled={isCopying || entries.length === 0}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-sm font-medium transition-all active:scale-95 ${
+                  copySuccess
+                    ? 'bg-green-500 text-white'
+                    : 'bg-gray-800 text-white hover:bg-gray-700'
+                } ${isCopying ? 'opacity-70' : ''}`}
+              >
+                {copySuccess ? (
+                  <>
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
+                    已复制
+                  </>
+                ) : (
+                  <>
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3" />
+                    </svg>
+                    复制全部
+                  </>
+                )}
+              </button>
+            </div>
           </div>
 
-          {groupedEntries.map(({ dateStr, entries: dayEntries }) => {
+          {/* 列表模式 */}
+          {viewMode === 'list' && (
+            <div className="space-y-1">
+              {entries.sort((a, b) => b.timestamp - a.timestamp).map(entry => {
+                const moodConfig = getMoodConfig(entry.mood);
+                const hexColor = moodConfig?.hexColor || getHexFromTailwind(moodConfig?.color || 'bg-gray-400');
+                const time = new Date(entry.timestamp).toLocaleTimeString('zh-CN', {
+                  hour: '2-digit',
+                  minute: '2-digit'
+                });
+                const isExpanded = expandedEntryId === entry.id;
+                const plainContent = stripHtml(entry.content);
+
+                return (
+                  <div key={entry.id}>
+                    {/* 列表项头部（始终显示） */}
+                    <div
+                      onClick={() => toggleEntryExpand(entry.id)}
+                      className="flex items-center gap-3 px-3 py-2.5 bg-white/60 rounded-xl hover:bg-white/80 transition-colors cursor-pointer"
+                    >
+                      {/* 左侧：表情 + 心情 */}
+                      <div className="flex items-center gap-1.5 flex-shrink-0">
+                        <span className="text-lg">{moodConfig?.emoji || '🏷️'}</span>
+                        <span
+                          className="text-sm font-medium"
+                          style={{ color: hexColor }}
+                        >
+                          {entry.mood}
+                        </span>
+                        {entry.energyDelta !== undefined && (
+                          <span className={`text-xs ${entry.energyDelta >= 0 ? 'text-green-600' : 'text-red-500'}`}>
+                            {entry.energyDelta >= 0 ? '+' : ''}{entry.energyDelta}
+                          </span>
+                        )}
+                      </div>
+
+                      {/* 中间：内容摘要 */}
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm text-gray-600 truncate">
+                          {plainContent || '无内容'}
+                        </p>
+                      </div>
+
+                      {/* 右侧：时间 */}
+                      <div className="flex-shrink-0 text-right">
+                        <span className="text-xs text-gray-400 font-mono">
+                          {time}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* 展开内容 */}
+                    {isExpanded && (
+                      <div className="mx-2 px-3 py-3 bg-white/40 rounded-b-xl border-t border-gray-100">
+                        <div
+                          className="text-sm text-gray-600 leading-relaxed"
+                          dangerouslySetInnerHTML={{ __html: entry.content }}
+                        />
+                        {/* AI 回复 */}
+                        {entry.aiReply && (
+                          <div className="mt-3 pl-3 border-l-2" style={{ borderColor: hexColor }}>
+                            <p className="text-sm italic" style={{ color: hexColor }}>
+                              <span className="not-italic mr-1">🤖</span>
+                              {entry.aiReply}
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {/* 卡片模式 */}
+          {viewMode === 'card' && groupedEntries.map(({ dateStr, entries: dayEntries }) => {
             const isCollapsed = collapsedDates.has(dateStr);
             const date = new Date(dateStr);
             const weekday = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'][date.getDay()];

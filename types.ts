@@ -182,5 +182,6 @@ export interface MentorConfig {
 
 export interface UserSettings {
   selectedMentor: MentorType;
+  moodHistoryViewMode?: 'list' | 'card';
   // 后续扩展：通知设置、主题等
 }

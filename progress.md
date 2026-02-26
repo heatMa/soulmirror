@@ -397,6 +397,51 @@ cloudbase hosting:deploy dist -e soulmirror-3gen9oau21b35f0d
 
 #### 文档更新
 - ✅ CLAUDE.md 部署章节更新，腾讯云为主要部署方式
+
+---
+
+## 2025-02-26 跨平台数据存储教训
+
+### 问题：直接使用 localStorage 导致移动端数据丢失
+
+**场景:** 在 MoodHistory 组件中实现视图模式切换（列表/卡片）时，直接使用 `localStorage.setItem()` 保存用户偏好。
+
+**后果:**
+- Web 端正常工作
+- Android 端（SQLite）视图模式无法保存，每次打开都恢复默认值
+
+**根本原因:**
+SoulMirror 使用双存储策略：
+- Web: localStorage
+- Native: SQLite via `@capacitor-community/sqlite`
+
+`databaseService` 已经封装了跨平台逻辑，但我绕过了它直接访问 localStorage。
+
+**修复方案:**
+```typescript
+// ❌ 错误 - 仅 Web 有效
+localStorage.setItem('moodHistoryViewMode', viewMode);
+
+// ✅ 正确 - Web 和 Native 都有效
+const settings = await databaseService.getUserSettings();
+await databaseService.saveUserSettings({
+  ...settings,
+  moodHistoryViewMode: viewMode
+});
+```
+
+**经验教训:**
+1. **所有持久化存储必须通过 `databaseService`**
+2. 永远不要直接使用 `localStorage` 存储应用数据
+3. 新增设置字段时：
+   - 先更新 `UserSettings` 类型定义（types.ts）
+   - 使用 `getUserSettings()` / `saveUserSettings()` 读写
+4. 在 CLAUDE.md 中添加了「Cross-Platform Data Storage Rule」章节
+
+**相关文件:**
+- `services/databaseService.ts` - 统一存储接口
+- `types.ts` - `UserSettings` 接口定义
+- `CLAUDE.md` - 已更新数据层文档
 - ✅ progress.md 添加部署迁移记录
 
 ---

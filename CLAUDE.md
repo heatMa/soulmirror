@@ -87,6 +87,26 @@ declare module './databaseService' {
 DatabaseService.prototype.newMethod = async function() {...}
 ```
 
+**CRITICAL: Cross-Platform Data Storage Rule**
+
+All persistent data MUST go through `databaseService`. NEVER use `localStorage` directly:
+
+```typescript
+// ✅ CORRECT - Works on both Web and Native
+import { databaseService } from '../services/databaseService';
+
+const settings = await databaseService.getUserSettings();
+await databaseService.saveUserSettings({ ...settings, viewMode: 'list' });
+
+// ❌ WRONG - Only works on Web, breaks on Android
+localStorage.setItem('viewMode', 'list');  // DON'T DO THIS
+```
+
+**Platform Implementation Details:**
+- Web: Uses `localStorage` keys prefixed with `soulmirror_setting_`
+- Native: Uses SQLite `user_settings` table
+- API: `getSetting(key)` / `saveSetting(key, value)` / `getUserSettings()` / `saveUserSettings(settings)`
+
 ### AI Service
 
 `geminiService.ts` exports functions:
