@@ -786,7 +786,8 @@ ${hasMultipleSources ? `# Input Context
 
 export const generateAIDiary = async (
   entries: DiaryEntry[],
-  dateStr: string
+  dateStr: string,
+  mentorType: MentorType = 'naval'
 ): Promise<string> => {
   if (entries.length === 0) {
     return '暂无情绪记录，无法生成日记。';
@@ -805,7 +806,11 @@ export const generateAIDiary = async (
     return `${emoji} ${e.mood} (${time}，能量值${energyDelta > 0 ? '+' : ''}${energyDelta}${durationStr})\n${contentText || '（无详细内容）'}`;
   }).join('\n\n');
 
-  const systemPrompt = `你是用户的AI晨间日记助手。基于用户前一天的情绪记录，生成一份结构化的晨间复盘日记。
+  // 获取导师特定的AI日记提示词
+  const mentor = MENTORS[mentorType];
+  const mentorPrompt = mentor?.systemPrompt?.aiDiary;
+
+  const systemPrompt = mentorPrompt || `你是用户的AI晨间日记助手。基于用户前一天的情绪记录，生成一份结构化的晨间复盘日记。
 
 请严格按照以下格式输出：
 

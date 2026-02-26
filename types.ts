@@ -177,6 +177,7 @@ export interface MentorConfig {
     reply: string;
     regulation: string;
     weekly: string;
+    aiDiary: string;
   };
 }
 

@@ -924,6 +924,7 @@ const App: React.FC = () => {
                 setAiDiaryContent(content);
                 setAiDiaryGeneratedAt(Date.now());
               }}
+              mentorType={selectedMentor}
             />
 
             {/* Daily Note Editor - 今日笔记 */}

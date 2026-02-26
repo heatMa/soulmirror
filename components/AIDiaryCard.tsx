@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { DiaryEntry } from '../types';
+import { DiaryEntry, MentorType } from '../types';
 import { generateAIDiary } from '../services/geminiService';
 import { databaseService } from '../services/databaseService';
 
@@ -9,6 +9,7 @@ interface Props {
   initialContent?: string;
   initialGeneratedAt?: number;
   onContentGenerated?: (content: string) => void;
+  mentorType?: MentorType;
 }
 
 export const AIDiaryCard: React.FC<Props> = ({
@@ -16,7 +17,8 @@ export const AIDiaryCard: React.FC<Props> = ({
   entries,
   initialContent,
   initialGeneratedAt,
-  onContentGenerated
+  onContentGenerated,
+  mentorType = 'naval'
 }) => {
   const [isExpanded, setIsExpanded] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
@@ -36,7 +38,7 @@ export const AIDiaryCard: React.FC<Props> = ({
     setError('');
 
     try {
-      const result = await generateAIDiary(entries, dateStr);
+      const result = await generateAIDiary(entries, dateStr, mentorType);
       setContent(result);
       setGeneratedAt(Date.now());
 
@@ -50,7 +52,7 @@ export const AIDiaryCard: React.FC<Props> = ({
     } finally {
       setIsGenerating(false);
     }
-  }, [entries, dateStr, onContentGenerated]);
+  }, [entries, dateStr, onContentGenerated, mentorType]);
 
   const toggleExpand = () => {
     if (!isGenerating) {
@@ -110,7 +112,7 @@ export const AIDiaryCard: React.FC<Props> = ({
             </svg>
           </div>
           <div>
-            <h3 className="font-semibold text-gray-800">AI晨间日记</h3>
+            <h3 className="text-sm font-bold text-gray-700">AI晨间日记</h3>
             {formattedTime && (
               <p className="text-xs text-gray-500">生成于 {formattedTime}</p>
             )}
@@ -118,6 +120,27 @@ export const AIDiaryCard: React.FC<Props> = ({
         </div>
 
         <div className="flex items-center gap-2">
+          {/* 手动生成/重新生成按钮 - 收起状态下显示 */}
+          {!isExpanded && entries.length > 0 && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                handleGenerate();
+              }}
+              disabled={isGenerating}
+              className="p-1.5 rounded-lg hover:bg-slate-100 transition-colors disabled:opacity-50"
+              title={content ? '重新生成' : '生成AI日记'}
+            >
+              <svg
+                className={`w-4 h-4 text-gray-500 ${isGenerating ? 'animate-spin' : ''}`}
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+              </svg>
+            </button>
+          )}
           {isGenerating && (
             <span className="text-xs text-amber-600 animate-pulse">生成中...</span>
           )}
