@@ -16,7 +16,7 @@ import WeeklyReportCard from './components/WeeklyReportCard';
 import WeeklyReportView from './components/WeeklyReportView';
 import WeeklyReportPreview from './components/WeeklyReportPreview';
 import EntryCommentSheet from './components/EntryCommentSheet';
-import { ICONS, MOOD_OPTIONS, MoodOption, getEffectiveCustomMoods, DEFAULT_MENTOR } from './constants';
+import { ICONS, MOOD_OPTIONS, MoodOption, getEffectiveCustomMoods, DEFAULT_MENTOR, getHexFromTailwind } from './constants';
 import { evaluateMoodScore, generateAiReply, generateRegulationSuggestions } from './services/geminiService';
 import { databaseService } from './services/databaseService';
 import { getEnergyAfterEntry } from './utils/energyUtils';
@@ -64,6 +64,11 @@ const App: React.FC = () => {
   const [aiDiaryContent, setAiDiaryContent] = useState<string>('');
   const [aiDiaryGeneratedAt, setAiDiaryGeneratedAt] = useState<number | undefined>();
 
+  // 时间线视图模式：列表或卡片（默认列表）
+  const [timelineViewMode, setTimelineViewMode] = useState<'list' | 'card'>('list');
+  // 列表模式下展开的条目ID
+  const [expandedEntryId, setExpandedEntryId] = useState<string | null>(null);
+
   // 初始化数据库并加载数据
   useEffect(() => {
     const initializeApp = async () => {
@@ -84,6 +89,9 @@ const App: React.FC = () => {
         
         // 设置导师
         setSelectedMentor(userSettings.selectedMentor);
+
+        // 设置时间线视图模式（默认列表）
+        setTimelineViewMode(userSettings.moodHistoryViewMode || 'list');
 
         // 清理与默认心情重复的自定义心情（持久化清理，下次加载时不再有重复）
         const defaultLabels = MOOD_OPTIONS.map(m => m.label);
@@ -572,6 +580,22 @@ const App: React.FC = () => {
     }
   }, []);
 
+  // 切换时间线视图模式
+  const toggleTimelineViewMode = useCallback(async () => {
+    const newMode = timelineViewMode === 'list' ? 'card' : 'list';
+    setTimelineViewMode(newMode);
+    setExpandedEntryId(null); // 切换视图时清除展开状态
+    try {
+      const currentSettings = await databaseService.getUserSettings();
+      await databaseService.saveUserSettings({
+        ...currentSettings,
+        moodHistoryViewMode: newMode
+      });
+    } catch (err) {
+      console.error('保存视图偏好失败:', err);
+    }
+  }, [timelineViewMode]);
+
   const effectiveCustomMoods = useMemo(() => getEffectiveCustomMoods(customMoods), [customMoods]);
 
   const getMoodConfig = (moodLabel: string, entry?: DiaryEntry): MoodOption => {
@@ -918,8 +942,38 @@ const App: React.FC = () => {
             {/* 今日记录标题和字数统计 */}
             <div className="flex flex-col gap-3 mb-4 px-1">
               <div className="flex justify-between items-center">
-                <h3 className="text-lg font-bold text-gray-800">今日记录</h3>
-                <span className="text-xs text-gray-500">{timelineEntries.length} 条</span>
+                <div className="flex items-center gap-2">
+                  <h3 className="text-lg font-bold text-gray-800">今日记录</h3>
+                  <span className="text-xs text-gray-500">{timelineEntries.length} 条</span>
+                </div>
+
+                {/* 视图切换按钮 */}
+                {timelineEntries.length > 0 && (
+                  <div className="flex items-center bg-white/50 rounded-lg p-0.5">
+                    <button
+                      onClick={() => timelineViewMode !== 'list' && toggleTimelineViewMode()}
+                      className={`p-1.5 rounded-md transition-all ${
+                        timelineViewMode === 'list'
+                          ? 'bg-white shadow-sm text-gray-800'
+                          : 'text-gray-400 hover:text-gray-600'
+                      }`}
+                      title="列表视图"
+                    >
+                      <ICONS.List />
+                    </button>
+                    <button
+                      onClick={() => timelineViewMode !== 'card' && toggleTimelineViewMode()}
+                      className={`p-1.5 rounded-md transition-all ${
+                        timelineViewMode === 'card'
+                          ? 'bg-white shadow-sm text-gray-800'
+                          : 'text-gray-400 hover:text-gray-600'
+                      }`}
+                      title="卡片视图"
+                    >
+                      <ICONS.Grid />
+                    </button>
+                  </div>
+                )}
               </div>
               
               {/* 字数统计卡片 */}
@@ -953,7 +1007,101 @@ const App: React.FC = () => {
                     今天还没有具体的心情卡片记录...
                  </div>
               </div>
+            ) : timelineViewMode === 'list' ? (
+              // 列表模式
+              <div className="space-y-1 animate-in slide-in-from-bottom-8 duration-500">
+                {timelineEntries.map(entry => {
+                  const moodConfig = getMoodConfig(entry.mood, entry);
+                  const hexColor = moodConfig?.hexColor || getHexFromTailwind(moodConfig?.color || 'bg-gray-400');
+                  const time = new Date(entry.timestamp).toLocaleTimeString('zh-CN', {
+                    hour: '2-digit',
+                    minute: '2-digit'
+                  });
+                  const isExpanded = expandedEntryId === entry.id;
+                  const plainContent = entry.content.replace(/<[^>]*>/g, '');
+
+                  return (
+                    <div key={entry.id}>
+                      {/* 列表项头部（始终显示） */}
+                      <div
+                        onClick={() => setExpandedEntryId(isExpanded ? null : entry.id)}
+                        className="flex items-center gap-3 px-3 py-2.5 bg-white/60 rounded-xl hover:bg-white/80 transition-colors cursor-pointer"
+                      >
+                        {/* 左侧：表情 + 心情 */}
+                        <div className="flex items-center gap-1.5 flex-shrink-0">
+                          <span className="text-lg">{moodConfig?.emoji || '🏷️'}</span>
+                          <span className="text-sm font-medium" style={{ color: hexColor }}>
+                            {entry.mood}
+                          </span>
+                          {entry.energyDelta !== undefined && (
+                            <span className={`text-xs ${entry.energyDelta >= 0 ? 'text-green-600' : 'text-red-500'}`}>
+                              {entry.energyDelta >= 0 ? '+' : ''}{entry.energyDelta}
+                            </span>
+                          )}
+                        </div>
+
+                        {/* 中间：内容摘要 */}
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm text-gray-600 truncate">
+                            {plainContent || '无内容'}
+                          </p>
+                        </div>
+
+                        {/* 右侧：时间 + 编辑按钮 */}
+                        <div className="flex items-center gap-2 flex-shrink-0">
+                          <span className="text-xs text-gray-400 font-mono">{time}</span>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              openEditModal(entry);
+                            }}
+                            className="p-1 text-gray-400 hover:text-gray-600 rounded-md hover:bg-white/50"
+                          >
+                            <ICONS.Pen />
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* 展开内容 */}
+                      {isExpanded && (
+                        <div className="mx-2 px-3 py-3 bg-white/40 rounded-b-xl border-t border-gray-100">
+                          <div
+                            className="text-sm text-gray-600 leading-relaxed"
+                            dangerouslySetInnerHTML={{ __html: entry.content }}
+                          />
+                          {/* AI 回复 */}
+                          {entry.aiReply && (
+                            <div className="mt-3 pl-3 border-l-2" style={{ borderColor: hexColor }}>
+                              <p className="text-sm italic" style={{ color: hexColor }}>
+                                <span className="not-italic mr-1">🤖</span>
+                                {entry.aiReply}
+                              </p>
+                            </div>
+                          )}
+                          {/* AI 建议 */}
+                          {entry.aiSuggestions && entry.aiSuggestions.length > 0 && (
+                            <div className="mt-3 rounded-xl p-3" style={{ backgroundColor: `${hexColor}15` }}>
+                              <p className="text-xs font-bold mb-2" style={{ color: hexColor }}>
+                                建议尝试
+                              </p>
+                              <ul className="space-y-1">
+                                {entry.aiSuggestions.map((suggestion, idx) => (
+                                  <li key={idx} className="text-sm text-gray-600 flex items-start gap-2">
+                                    <span>•</span>
+                                    <span>{suggestion}</span>
+                                  </li>
+                                ))}
+                              </ul>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
             ) : (
+              // 卡片模式（使用 TimelineItem）
               <div className="glass-card rounded-[32px] p-3 animate-in slide-in-from-bottom-8 duration-500 min-h-[200px]">
                 {timelineEntries.map((entry, index) => {
                   const moodConfig = getMoodConfig(entry.mood, entry);
